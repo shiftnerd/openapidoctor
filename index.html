@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Schema Doctor</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #1e1e1e;
+      --text-color: #ffffff;
+      --button-bg: #363636;
+      --button-text: #ffffff;
+      --success-button-bg: #48c774;
+      --success-button-text: #ffffff;
+      --save-button-bg: #3273dc;
+      --save-button-hover: #2366d1;
+    }
+
+    body.light-theme {
+      --bg-color: #ffffff;
+      --text-color: #000000;
+      --button-bg: #f5f5f5;
+      --button-text: #363636;
+      --success-button-bg: #48c774;
+      --success-button-text: #ffffff;
+      --save-button-bg: #3273dc;
+      --save-button-hover: #2366d1;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .title, .label {
+      color: var(--text-color) !important;
+    }
+
+    .button {
+      background-color: var(--button-bg) !important;
+      color: var(--button-text) !important;
+    }
+
+    .button.is-success {
+      background-color: var(--success-button-bg) !important;
+      color: var(--success-button-text) !important;
+    }
+
+    .button.is-primary {
+      background-color: var(--save-button-bg) !important;
+      color: #ffffff !important;
+      font-weight: bold;
+      font-size: 1.1em;
+      padding: 1.25em 2em;
+      transition: background-color 0.3s ease;
+    }
+
+    .button.is-primary:hover {
+      background-color: var(--save-button-hover) !important;
+      transform: translateY(-1px);
+    }
+
+    .select select {
+      background-color: var(--button-bg);
+      color: var(--button-text);
+      border-color: var(--button-bg);
+    }
+
+    #changeLog {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 1rem;
+      border: 1px solid var(--text-color);
+    }
+  </style>
+</head>
+<body>
+  <section class="section">
+    <div class="container">
+      <h1 class="title">OpenAPI Schema Editor</h1>
+      <div class="columns">
+        <div class="column">
+          <div class="field">
+            <label class="label">URL</label>
+            <div class="control">
+              <input class="input" type="text" id="url-input" placeholder="Enter a URL ending in .json or .yaml">
+            </div>
+          </div>
+          <div class="field">
+            <div class="control">
+              <button class="button" onclick="loadFromUrl()">Load</button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Theme</label>
+            <div class="control">
+              <div class="select">
+                <select id="theme-select">
+                  <option value="dark">Dark Theme</option>
+                  <option value="light">Light Theme</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Actions</label>
+            <div class="control">
+              <button class="button" onclick="convertYamlToJson()">Convert YAML to JSON</button>
+              <button class="button" onclick="validateJson()">Validate JSON</button>
+              <button class="button" onclick="beautifyJson()">Beautify JSON</button>
+              <button class="button" onclick="setDefaultDescriptions()">Set Default Descriptions</button>
+              <button class="button" onclick="addMissingOperationIds()">Add Missing OperationIds</button>
+              <button class="button" onclick="fixPathsEndingWithSlash()">Fix Paths Ending with Slash</button>
+              <button class="button" onclick="handleCircularReferences()">Handle Circular References</button>
+              <button class="button is-success" onclick="runAllOptions()">Run All Options</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="columns">
+        <div class="column">
+          <div id="editor" style="height: 600px;"></div>
+        </div>
+      </div>
+      <div class="columns">
+        <div class="column">
+          <div class="field">
+            <div class="control">
+              <button class="button is-primary" onclick="saveFile()">Save File</button>
+            </div>
+          </div>
+          <h2 class="title is-5">Change Log</h2>
+          <pre id="changeLog"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.min.js"></script>
+  <script>
+    let editor;
+    let changeLog = '';
+
+    // Load saved theme from localStorage
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+      document.body.classList.add('light-theme');
+    }
+
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' }});
+    require(['vs/editor/editor.main'], function() {
+      editor = monaco.editor.create(document.getElementById('editor'), {
+        value: '',
+        language: 'json',
+        theme: savedTheme === 'light' ? 'vs' : 'vs-dark'
+      });
+
+      // Theme switching logic with localStorage
+      const themeSelect = document.getElementById('theme-select');
+      themeSelect.value = savedTheme; // Set initial value from localStorage
+      themeSelect.addEventListener('change', (e) => {
+        const theme = e.target.value;
+        localStorage.setItem('theme', theme); // Save to localStorage
+        if (theme === 'light') {
+          document.body.classList.add('light-theme');
+          monaco.editor.setTheme('vs');
+        } else {
+          document.body.classList.remove('light-theme');
+          monaco.editor.setTheme('vs-dark');
+        }
+      });
+    });
+
+    function saveFile() {
+      const content = editor.getValue();
+      const blob = new Blob([content], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'openapi-schema.json';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      updateChangeLog('File saved successfully');
+    }
+
+    async function loadFromUrl() {
+      const urlInput = document.getElementById('url-input');
+      const url = urlInput.value.trim();
+
+      if (url.endsWith('.json') || url.endsWith('.yaml')) {
+        try {
+          const response = await fetch(url);
+          const content = await response.text();
+
+          if (url.endsWith('.json')) {
+            editor.setValue(content);
+            monaco.editor.setModelLanguage(editor.getModel(), 'json');
+          } else if (url.endsWith('.yaml')) {
+            editor.setValue(content);
+            monaco.editor.setModelLanguage(editor.getModel(), 'yaml');
+          }
+
+          updateChangeLog(`Loaded content from URL: ${url}`);
+        } catch (error) {
+          console.error('Error loading content from URL:', error);
+          if (error.message.includes('Failed to fetch') || error.message.includes('No Access-Control-Allow-Origin header')) {
+            const useProxy = confirm('Failed to load content from the provided URL. Do you want to try using a proxy server?');
+            if (useProxy) {
+              loadFromUrlWithProxy(url);
+            } else {
+              updateChangeLog('Error: Failed to load content from the provided URL.');
+            }
+          } else {
+            updateChangeLog('Error: Failed to load content from the provided URL.');
+          }
+        }
+      } else {
+        updateChangeLog('Error: Invalid URL. Please provide a URL ending in .json or .yaml.');
+      }
+    }
+
+    async function loadFromUrlWithProxy(url) {
+      try {
+        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        const response = await fetch(proxyUrl + url);
+        const content = await response.text();
+
+        if (url.endsWith('.json')) {
+          editor.setValue(content);
+          monaco.editor.setModelLanguage(editor.getModel(), 'json');
+        } else if (url.endsWith('.yaml')) {
+          editor.setValue(content);
+          monaco.editor.setModelLanguage(editor.getModel(), 'yaml');
+        }
+
+        updateChangeLog(`Loaded content from URL (using proxy): ${url}`);
+      } catch (error) {
+        console.error('Error loading content from URL (using proxy):', error);
+        updateChangeLog('Error: Failed to load content from the provided URL (using proxy).');
+      }
+    }
+
+    function convertYamlToJson() {
+      const content = editor.getValue();
+      if (isJson(content)) {
+        updateChangeLog('The content is already in JSON format. No conversion performed.');
+        return;
+      }
+
+      try {
+        const json = jsyaml.load(content);
+        const formattedJson = JSON.stringify(json, null, 2);
+        editor.setValue(formattedJson);
+        monaco.editor.setModelLanguage(editor.getModel(), 'json');
+        updateChangeLog('Converted YAML to JSON');
+      } catch (error) {
+        console.error('Error converting YAML to JSON:', error);
+        updateChangeLog('Error: Invalid YAML input. Please check the format and try again.');
+      }
+    }
+
+    function isJson(str) {
+      try {
+        JSON.parse(str);
+      } catch (e) {
+        return false;
+      }
+      return true;
+    }
+
+    function beautifyJson() {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        const beautifiedJson = JSON.stringify(parsedJson, null, 2);
+        editor.setValue(beautifiedJson);
+        updateChangeLog('Beautified JSON');
+      } catch (error) {
+        console.error('Error beautifying JSON:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function setDefaultDescriptions() {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        const updatedPaths = traverseAndSetDefaultDescriptions(parsedJson);
+        const updatedJson = JSON.stringify(parsedJson, null, 2);
+        editor.setValue(updatedJson);
+        if (updatedPaths.length > 0) {
+          updateChangeLog('Set default descriptions:\n' + updatedPaths.join('\n'));
+        } else {
+          updateChangeLog('No default descriptions needed');
+        }
+      } catch (error) {
+        console.error('Error setting default descriptions:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function traverseAndSetDefaultDescriptions(obj, circularRefs = new Set(), path = '') {
+      if (circularRefs.has(obj)) {
+        return [];
+      }
+      circularRefs.add(obj);
+
+      const updatedPaths = [];
+
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          if (key === 'description' && (obj[key] === undefined || obj[key] === '')) {
+            obj[key] = 'No description provided.';
+            updatedPaths.push(`- Set default description for ${currentPath}`);
+          } else if (typeof obj[key] === 'object') {
+            updatedPaths.push(...traverseAndSetDefaultDescriptions(obj[key], circularRefs, currentPath));
+          }
+        }
+      }
+
+      circularRefs.delete(obj);
+      return updatedPaths;
+    }
+
+    function addMissingOperationIds() {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        const addedOperationIds = traverseAndAddOperationIds(parsedJson);
+        const updatedJson = JSON.stringify(parsedJson, null, 2);
+        editor.setValue(updatedJson);
+        if (addedOperationIds.length > 0) {
+          updateChangeLog('Added missing operationIds:\n' + addedOperationIds.join('\n'));
+        } else {
+          updateChangeLog('No missing OperationIDs found');
+        }
+      } catch (error) {
+        console.error('Error adding missing operationIds:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function traverseAndAddOperationIds(obj, circularRefs = new Set(), addedOperationIds = []) {
+      if (circularRefs.has(obj)) {
+        return addedOperationIds;
+      }
+      circularRefs.add(obj);
+
+      if (obj.paths) {
+        for (const path in obj.paths) {
+          if (obj.paths.hasOwnProperty(path)) {
+            const pathItem = obj.paths[path];
+            for (const method in pathItem) {
+              if (pathItem.hasOwnProperty(method) && ['get', 'post', 'put', 'delete', 'options', 'head', 'patch', 'trace'].includes(method)) {
+                const operation = pathItem[method];
+                if (!operation.operationId) {
+                  const generatedOperationId = `${method}_${path}`.replace(/[^a-zA-Z0-9]/g, '_');
+                  operation.operationId = generatedOperationId;
+                  addedOperationIds.push(`- Added operationId "${generatedOperationId}" for ${method.toUpperCase()} ${path}`);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      circularRefs.delete(obj);
+      return addedOperationIds;
+    }
+
+    function fixPathsEndingWithSlash() {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        const fixedPaths = fixPathsEndingWithSlashHelper(parsedJson);
+        const updatedJson = JSON.stringify(parsedJson, null, 2);
+        editor.setValue(updatedJson);
+        if (fixedPaths.length > 0) {
+          updateChangeLog('Fixed paths ending with slash:\n' + fixedPaths.join('\n'));
+        } else {
+          updateChangeLog('No paths ending with slash found');
+        }
+      } catch (error) {
+        console.error('Error fixing paths ending with slash:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function fixPathsEndingWithSlashHelper(obj, circularRefs = new Set(), fixedPaths = []) {
+      if (circularRefs.has(obj)) {
+        return fixedPaths;
+      }
+      circularRefs.add(obj);
+
+      if (obj.paths) {
+        const updatedPaths = {};
+        for (const path in obj.paths) {
+          if (obj.paths.hasOwnProperty(path)) {
+            const fixedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+            if (fixedPath !== path) {
+              fixedPaths.push(`- Removed trailing slash from path: ${path} -> ${fixedPath}`);
+            }
+            updatedPaths[fixedPath] = obj.paths[path];
+          }
+        }
+        obj.paths = updatedPaths;
+      }
+
+      circularRefs.delete(obj);
+      return fixedPaths;
+    }
+
+    function handleCircularReferences() {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        const circularReferences = findCircularReferences(parsedJson);
+        if (circularReferences.length > 0) {
+          updateChangeLog('Circular references found:\n' + circularReferences.join('\n'));
+        } else {
+          updateChangeLog('No circular references found.');
+        }
+      } catch (error) {
+        console.error('Error handling circular references:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function findCircularReferences(obj, circularRefs = new Set(), path = '', foundCircularRefs = []) {
+      if (circularRefs.has(obj)) {
+        foundCircularRefs.push(`- Circular reference found at path: ${path}`);
+        return foundCircularRefs;
+      }
+      circularRefs.add(obj);
+
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          if (typeof obj[key] === 'object') {
+            findCircularReferences(obj[key], circularRefs, currentPath, foundCircularRefs);
+          }
+        }
+      }
+
+      circularRefs.delete(obj);
+      return foundCircularRefs;
+    }
+
+    function runAllOptions() {
+      convertYamlToJson();
+      validateJson();
+      beautifyJson();
+      setDefaultDescriptions();
+      addMissingOperationIds();
+      fixPathsEndingWithSlash();
+      handleCircularReferences();
+    }
+
+    function validateJson() {
+      const json = editor.getValue();
+      try {
+        JSON.parse(json);
+        updateChangeLog('JSON formatting is valid.');
+      } catch (error) {
+        console.error('JSON validation error:', error);
+        updateChangeLog('Error: Invalid JSON. Please check the format and try again.');
+      }
+    }
+
+    function updateChangeLog(message) {
+      changeLog = `${message}\n\n${changeLog}`;
+      document.getElementById('changeLog').textContent = changeLog;
+    }
+  </script>
+</body>
+</html>
