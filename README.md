@@ -1,4 +1,4 @@
-# OpenAPI Schema Editor
+# API Schema Doctor
 
 The OpenAPI Schema Editor is a web-based tool for editing and manipulating OpenAPI schemas in JSON or YAML format. It provides a user-friendly interface for loading, editing, and applying various transformations to OpenAPI schemas.
 
