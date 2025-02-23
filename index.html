@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>API Schema Doctor</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
@@ -35,10 +36,10 @@
       min-height: 100vh;
       margin: 0;
       padding: 0;
-
     }
 
-    .title, .label {
+    .title,
+    .label {
       color: var(--text-color) !important;
     }
 
@@ -78,67 +79,124 @@
       padding: 1rem;
       border: 1px solid var(--text-color);
     }
+
+    .legal-disclaimer {
+      text-align: center;
+      font-size: 0.8em;
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+      color: var(--text-color);
+    }
+
+    .legal-disclaimer a {
+      color: var(--button-text);
+      text-decoration: underline;
+      transition: color 0.3s ease;
+    }
+
+    .legal-disclaimer a:hover {
+      color: var(--save-button-hover);
+    }
+
+    .checkbox-label {
+      color: var(--text-color);
+      margin-left: 0.5em;
+    }
+
+    .checkbox-container {
+      margin-bottom: 0.5em;
+    }
+
+    .content-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
   </style>
 </head>
+
 <body>
-  <section class="section">
-    <div class="container">
+  <section class="section" style="padding-top: 0.5rem;">
+    <div class="content-container">
       <h1 class="title">API Schema Doctor</h1>
-      <div class="columns">
-        <div class="column">
-          <div class="field">
-            <label class="label">URL</label>
-            <div class="control">
-              <input class="input" type="text" id="url-input" placeholder="Enter a URL ending in .json or .yaml">
-            </div>
-          </div>
-          <div class="field">
-            <div class="control">
-              <button class="button" onclick="loadFromUrl()">Load</button>
-            </div>
-          </div>
-          <div class="field">
-            <label class="label">Theme</label>
-            <div class="control">
-              <div class="select">
-                <select id="theme-select">
-                  <option value="dark">Dark Theme</option>
-                  <option value="light">Light Theme</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="label">Actions</label>
-            <div class="control">
-              <button class="button" onclick="convertYamlToJson()">Convert YAML to JSON</button>
-              <button class="button" onclick="validateJson()">Validate JSON</button>
-              <button class="button" onclick="beautifyJson()">Beautify JSON</button>
-              <button class="button" onclick="setDefaultDescriptions()">Set Default Descriptions</button>
-              <button class="button" onclick="addMissingOperationIds()">Add Missing OperationIds</button>
-              <button class="button" onclick="fixPathsEndingWithSlash()">Fix Paths Ending with Slash</button>
-              <button class="button" onclick="handleCircularReferences()">Handle Circular References</button>
-              <button class="button is-success" onclick="runAllOptions()">Run All Options</button>
-            </div>
+      <div class="field" style="position: absolute; top: 1rem; right: 1rem;">
+        <div class="control">
+          <div class="select is-small">
+            <select id="theme-select" aria-label="Theme Selection">
+              <option value="dark">🌙 Dark</option>
+              <option value="light">☀️ Light</option>
+            </select>
           </div>
         </div>
       </div>
-      <div class="columns">
-        <div class="column">
-          <div id="editor" style="height: 600px;"></div>
+      <div class="field">
+        <label class="label">Load API Schema</label>
+        <div class="control" style="display: flex; gap: 0.5rem;">
+          <button class="button" onclick="toggleUrlModal()">Load from URL</button>
+          <button class="button" onclick="pasteFromClipboard()">Paste from Clipboard</button>
+          <input type="file" id="file-input" accept=".json, .yaml, .yml" style="display: none;"
+            onchange="uploadFile(event)">
+          <button class="button" onclick="document.getElementById('file-input').click()">Upload File</button>
         </div>
       </div>
-      <div class="columns">
-        <div class="column">
-          <div class="field">
-            <div class="control">
-              <button class="button is-primary" onclick="saveFile()">Save File</button>
-            </div>
+      <div class="field">
+        <label class="label">Actions</label>
+        <div class="control" style="display: flex; flex-wrap: wrap; gap: 1em;">
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="convertYaml" checked>
+            <span class="checkbox-label">Convert YAML to JSON</span>
           </div>
-          <h2 class="title is-5">Change Log</h2>
-          <pre id="changeLog"></pre>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="validateJson" checked>
+            <span class="checkbox-label">Validate JSON</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="beautifyJson" checked>
+            <span class="checkbox-label">Beautify JSON</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="setDescriptions" checked>
+            <span class="checkbox-label">Set Default Descriptions</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="addOperationIds" checked>
+            <span class="checkbox-label">Add Missing OperationIds</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="fixPaths" checked>
+            <span class="checkbox-label">Fix Paths Ending with Slash</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="handleCircular" checked>
+            <span class="checkbox-label">Handle Circular References</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="removeExamples" checked>
+            <span class="checkbox-label">Remove Example Keys</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="verifyParams" checked>
+            <span class="checkbox-label">Verify Path Parameters</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="handleDuplicates" checked>
+            <span class="checkbox-label">Handle Duplicate Parameters</span>
+          </div>
+          <button class="button is-success" style="width: 100%; margin-top: 1em;" onclick="runSelectedOptions()">Run
+            Selected Options</button>
         </div>
       </div>
+      <div class="editor-container">
+        <div id="editor" style="height: 600px; width: 100%;"></div>
+      </div>
+      <div class="field" style="margin-top: 1rem;">
+        <div class="control">
+          <button class="button is-primary" onclick="saveFile()">Save File</button>
+        </div>
+      </div>
+      <h2 class="title is-5">Change Log</h2>
+      <pre id="changeLog"></pre>
     </div>
   </section>
 
@@ -153,8 +211,8 @@
       document.body.classList.add('light-theme');
     }
 
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' }});
-    require(['vs/editor/editor.main'], function() {
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(document.getElementById('editor'), {
         value: '',
         language: 'json',
@@ -190,16 +248,32 @@
       document.body.removeChild(a);
       updateChangeLog('File saved successfully');
     }
+    // Toggles the modal's visibility by adding/removing the 'is-active' class.
+    function toggleUrlModal() {
+      const modal = document.getElementById('urlModal');
+      modal.classList.toggle('is-active');
+    }
 
-    async function loadFromUrl() {
-      const urlInput = document.getElementById('url-input');
+    // Loads the content from the URL entered in the modal
+    async function modalLoadFromUrl() {
+      const urlInput = document.getElementById('modal-url-input');
       const url = urlInput.value.trim();
 
+      if (!url) {
+        updateChangeLog('Error: URL cannot be empty.');
+        return;
+      }
+
+      // Hide the modal once the user has submitted
+      toggleUrlModal();
+
+      // Validate file extension and attempt to load
       if (url.endsWith('.json') || url.endsWith('.yaml')) {
         try {
           const response = await fetch(url);
           const content = await response.text();
 
+          // Set the editor content and language based on file type
           if (url.endsWith('.json')) {
             editor.setValue(content);
             monaco.editor.setModelLanguage(editor.getModel(), 'json');
@@ -211,40 +285,10 @@
           updateChangeLog(`Loaded content from URL: ${url}`);
         } catch (error) {
           console.error('Error loading content from URL:', error);
-          if (error.message.includes('Failed to fetch') || error.message.includes('No Access-Control-Allow-Origin header')) {
-            const useProxy = confirm('Failed to load content from the provided URL. Do you want to try using a proxy server?');
-            if (useProxy) {
-              loadFromUrlWithProxy(url);
-            } else {
-              updateChangeLog('Error: Failed to load content from the provided URL.');
-            }
-          } else {
-            updateChangeLog('Error: Failed to load content from the provided URL.');
-          }
+          updateChangeLog('Error: Failed to load content from the provided URL.');
         }
       } else {
         updateChangeLog('Error: Invalid URL. Please provide a URL ending in .json or .yaml.');
-      }
-    }
-
-    async function loadFromUrlWithProxy(url) {
-      try {
-        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-        const response = await fetch(proxyUrl + url);
-        const content = await response.text();
-
-        if (url.endsWith('.json')) {
-          editor.setValue(content);
-          monaco.editor.setModelLanguage(editor.getModel(), 'json');
-        } else if (url.endsWith('.yaml')) {
-          editor.setValue(content);
-          monaco.editor.setModelLanguage(editor.getModel(), 'yaml');
-        }
-
-        updateChangeLog(`Loaded content from URL (using proxy): ${url}`);
-      } catch (error) {
-        console.error('Error loading content from URL (using proxy):', error);
-        updateChangeLog('Error: Failed to load content from the provided URL (using proxy).');
       }
     }
 
@@ -454,15 +498,125 @@
       circularRefs.delete(obj);
       return foundCircularRefs;
     }
+    function handleDuplicateParameters(obj) {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        let duplicatesFound = false;
 
-    function runAllOptions() {
-      convertYamlToJson();
-      validateJson();
-      beautifyJson();
-      setDefaultDescriptions();
-      addMissingOperationIds();
-      fixPathsEndingWithSlash();
-      handleCircularReferences();
+        if (!parsedJson.paths) {
+          updateChangeLog('No paths found to check for duplicate parameters');
+          return;
+        }
+
+        Object.keys(parsedJson.paths).forEach(path => {
+          const pathItem = parsedJson.paths[path];
+          Object.keys(pathItem).forEach(method => {
+            if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options', 'trace'].includes(method)) {
+              const operation = pathItem[method];
+              if (operation.parameters) {
+                const uniqueParams = {};
+                const newParams = [];
+                operation.parameters.forEach(param => {
+                  const key = `${param.in}:${param.name}`;
+                  if (!uniqueParams[key]) {
+                    uniqueParams[key] = param;
+                    newParams.push(param);
+                  } else {
+                    duplicatesFound = true;
+                    updateChangeLog(`Removed duplicate parameter "${param.name}" in ${param.in} from ${method.toUpperCase()} ${path}`);
+                  }
+                });
+                operation.parameters = newParams;
+              }
+            }
+          });
+        });
+
+        if (!duplicatesFound) {
+          updateChangeLog('No duplicate parameters found');
+        }
+
+        editor.setValue(JSON.stringify(parsedJson, null, 2));
+      } catch (error) {
+        console.error('Error handling duplicate parameters:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function verifyPathParameters(obj) {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        let issuesFound = false;
+
+        if (!parsedJson.paths) {
+          updateChangeLog('No paths found to verify parameters');
+          return;
+        }
+
+        Object.keys(parsedJson.paths).forEach(path => {
+          const pathParams = [...path.matchAll(/{([^}]+)}/g)].map(match => match[1]);
+          const pathItem = parsedJson.paths[path];
+
+          Object.keys(pathItem).forEach(method => {
+            if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options', 'trace'].includes(method)) {
+              const operation = pathItem[method];
+              const definedParams = (operation.parameters || [])
+                .filter(p => p.in === 'path')
+                .map(p => p.name);
+
+              pathParams.forEach(param => {
+                if (!definedParams.includes(param)) {
+                  issuesFound = true;
+                  updateChangeLog(`Warning: Missing definition for path parameter "${param}" in ${method.toUpperCase()} ${path}`);
+                }
+              });
+            }
+          });
+        });
+
+        if (!issuesFound) {
+          updateChangeLog('All path parameters are properly defined');
+        }
+      } catch (error) {
+        console.error('Error verifying path parameters:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
+    }
+
+    function removeExampleKeys(obj) {
+      const json = editor.getValue();
+      try {
+        const parsedJson = JSON.parse(json);
+        let examplesRemoved = false;
+
+        function traverse(obj, path = '') {
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              const currentPath = path ? `${path}.${key}` : key;
+              if (key === 'example' || key === 'examples') {
+                delete obj[key];
+                examplesRemoved = true;
+                updateChangeLog(`Removed ${key} at ${currentPath}`);
+              } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                traverse(obj[key], currentPath);
+              }
+            }
+          }
+        }
+
+        traverse(parsedJson);
+
+        if (!examplesRemoved) {
+          updateChangeLog('No example keys found to remove');
+        }
+
+        editor.setValue(JSON.stringify(parsedJson, null, 2));
+      } catch (error) {
+        console.error('Error removing example keys:', error);
+        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+      }
     }
 
     function validateJson() {
@@ -476,11 +630,94 @@
       }
     }
 
+    function runSelectedOptions() {
+      if (document.getElementById('convertYaml').checked) convertYamlToJson();
+      if (document.getElementById('validateJson').checked) validateJson();
+      if (document.getElementById('beautifyJson').checked) beautifyJson();
+      if (document.getElementById('setDescriptions').checked) setDefaultDescriptions();
+      if (document.getElementById('addOperationIds').checked) addMissingOperationIds();
+      if (document.getElementById('fixPaths').checked) fixPathsEndingWithSlash();
+      if (document.getElementById('handleCircular').checked) handleCircularReferences();
+      if (document.getElementById('removeExamples').checked) removeExampleKeys();
+      if (document.getElementById('verifyParams').checked) verifyPathParameters();
+      if (document.getElementById('handleDuplicates').checked) handleDuplicateParameters();
+    }
+
     function updateChangeLog(message) {
       changeLog = `${message}\n\n${changeLog}`;
       document.getElementById('changeLog').textContent = changeLog;
     }
+
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          editor.setValue(text);
+          updateChangeLog('Pasted content from clipboard.');
+        } else {
+          updateChangeLog('Clipboard is empty.');
+        }
+      } catch (error) {
+        console.error('Clipboard paste failed:', error);
+        updateChangeLog('Error: Unable to paste from clipboard.');
+      }
+    }
+
+    // JavaScript function to handle file upload
+    function uploadFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const content = e.target.result;
+        // Determine the language based on file extension
+        if (file.name.endsWith('.json')) {
+          editor.setValue(content);
+          monaco.editor.setModelLanguage(editor.getModel(), 'json');
+          updateChangeLog(`Loaded ${file.name} as JSON`);
+        } else if (file.name.endsWith('.yaml') || file.name.endsWith('.yml')) {
+          editor.setValue(content);
+          monaco.editor.setModelLanguage(editor.getModel(), 'yaml');
+          updateChangeLog(`Loaded ${file.name} as YAML`);
+        } else {
+          updateChangeLog('Error: Unsupported file type. Please upload a .json, .yaml, or .yml file.');
+        }
+      };
+
+      reader.readAsText(file);
+    }
+
   </script>
-  <center>Disclaimer: This app is a community-driven project built by <a href="https://github.com/shiftnerd">Ben Climer</a> and is not officially supported or endorsed by Rewst. If you have suggestions or improvements, please <a href="https://github.com/shiftnerd/openapidoctor">submit a pull request.</a></center>
+  <!-- Modal for URL input -->
+  <div class="modal" id="urlModal">
+    <div class="modal-background" onclick="toggleUrlModal()"></div>
+    <div class="modal-card" style="background-color: var(--bg-color); color: var(--text-color);">
+      <header class="modal-card-head" style="background-color: var(--bg-color); border-color: var(--text-color);">
+        <p class="modal-card-title" style="color: var(--text-color);">Load Schema from URL</p>
+        <button class="delete" aria-label="close" onclick="toggleUrlModal()"></button>
+      </header>
+      <section class="modal-card-body" style="background-color: var(--bg-color);">
+        <div class="field">
+          <label class="label" style="color: var(--text-color);">Enter URL</label>
+          <div class="control">
+            <input class="input" type="text" id="modal-url-input" placeholder="Enter a URL ending in .json or .yaml"
+              style="background-color: var(--bg-color); color: var(--text-color); border-color: var(--text-color);">
+          </div>
+        </div>
+      </section>
+      <footer class="modal-card-foot" style="background-color: var(--bg-color); border-color: var(--text-color);">
+        <button class="button is-success" onclick="modalLoadFromUrl()">Load</button>
+        <button class="button" onclick="toggleUrlModal()">Cancel</button>
+      </footer>
+    </div>
+  </div>
+  <footer class="legal-disclaimer">
+    Disclaimer: This app is a community-driven project built by
+    <a href="https://github.com/shiftnerd">Ben Climer</a> and is not officially supported or endorsed by Rewst.
+    If you have suggestions or improvements, please
+    <a href="https://github.com/shiftnerd/openapidoctor">submit a pull request</a>.
+  </footer>
 </body>
+
 </html>
