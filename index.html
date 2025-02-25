@@ -113,6 +113,29 @@
       margin: 0 auto;
       padding: 0 1.5rem;
     }
+    #editor-stats-bar {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  transition: background-color 0.3s, color 0.3s;
+  font-family: monospace;
+  user-select: none;
+}
+
+#editor-stats {
+  display: inline-block;
+}
+
+@media (max-width: 768px) {
+  #editor-stats-bar {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
   </style>
 </head>
 
@@ -176,19 +199,38 @@
             <span class="checkbox-label">Remove Example Keys</span>
           </div>
           <div class="checkbox-container" style="flex: 0 1 20%;">
-            <input type="checkbox" id="verifyParams" checked>
-            <span class="checkbox-label">Verify Path Parameters</span>
+            <input type="checkbox" id="fixParams" checked>
+            <span class="checkbox-label">Fix Missing Path Parameters</span>
           </div>
           <div class="checkbox-container" style="flex: 0 1 20%;">
             <input type="checkbox" id="handleDuplicates" checked>
             <span class="checkbox-label">Handle Duplicate Parameters</span>
           </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="shortenDescriptions" checked>
+            <span class="checkbox-label">Shorten Descriptions</span>
+          </div>
+          <div class="checkbox-container" style="flex: 0 1 20%;">
+            <input type="checkbox" id="fixMissingRefs" checked>
+            <span class="checkbox-label">Fix Missing References</span>
+          </div>
           <button class="button is-success" style="width: 100%; margin-top: 1em;" onclick="runSelectedOptions()">Run
             Selected Options</button>
         </div>
       </div>
+      <div class="field">
+        <label class="label">Advanced Options</label>
+        <div class="control" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <button class="button" onclick="keepHalfPaths()">Keep Half of Paths</button>
+          <button class="button" onclick="togglePathLimitModal()">Keep Limited Paths</button>
+          <button class="button" onclick="togglePathPatternModal()">Keep Paths by Pattern</button>
+        </div>
+      </div>
       <div class="editor-container">
         <div id="editor" style="height: 600px; width: 100%;"></div>
+        <div id="editor-stats-bar">
+          <div id="editor-stats">Lines: 0 | Size: 0 B</div>
+        </div>
       </div>
       <div class="field" style="margin-top: 1rem;">
         <div class="control">
@@ -212,28 +254,36 @@
     }
 
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' } });
-    require(['vs/editor/editor.main'], function () {
-      editor = monaco.editor.create(document.getElementById('editor'), {
-        value: '',
-        language: 'json',
-        theme: savedTheme === 'light' ? 'vs' : 'vs-dark'
-      });
+require(['vs/editor/editor.main'], function () {
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    value: '',
+    language: 'json',
+    theme: savedTheme === 'light' ? 'vs' : 'vs-dark'
+  });
 
-      // Theme switching logic with localStorage
-      const themeSelect = document.getElementById('theme-select');
-      themeSelect.value = savedTheme; // Set initial value from localStorage
-      themeSelect.addEventListener('change', (e) => {
-        const theme = e.target.value;
-        localStorage.setItem('theme', theme); // Save to localStorage
-        if (theme === 'light') {
-          document.body.classList.add('light-theme');
-          monaco.editor.setTheme('vs');
-        } else {
-          document.body.classList.remove('light-theme');
-          monaco.editor.setTheme('vs-dark');
-        }
-      });
-    });
+  // Register change event listener for stats update
+  editor.onDidChangeModelContent(() => {
+    updateEditorStats();
+  });
+  
+  // Initial update of the stats
+  updateEditorStats();
+
+  // Theme switching logic with localStorage
+  const themeSelect = document.getElementById('theme-select');
+  themeSelect.value = savedTheme; // Set initial value from localStorage
+  themeSelect.addEventListener('change', (e) => {
+    const theme = e.target.value;
+    localStorage.setItem('theme', theme); // Save to localStorage
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+      monaco.editor.setTheme('vs');
+    } else {
+      document.body.classList.remove('light-theme');
+      monaco.editor.setTheme('vs-dark');
+    }
+  });
+});
 
     function saveFile() {
       const content = editor.getValue();
@@ -291,7 +341,25 @@
         updateChangeLog('Error: Invalid URL. Please provide a URL ending in .json or .yaml.');
       }
     }
-
+// Function to update editor stats
+function updateEditorStats() {
+  const content = editor.getValue();
+  const lineCount = content.split('\n').length;
+  const byteSize = new Blob([content]).size;
+  
+  // Format the size in a human-readable way
+  let formattedSize;
+  if (byteSize < 1024) {
+    formattedSize = `${byteSize} B`;
+  } else if (byteSize < 1024 * 1024) {
+    formattedSize = `${(byteSize / 1024).toFixed(1)} KB`;
+  } else {
+    formattedSize = `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  
+  // Update the status bar content
+  document.getElementById('editor-stats').textContent = `Lines: ${lineCount} | Size: ${formattedSize}`;
+}
     function convertYamlToJson() {
       const content = editor.getValue();
       if (isJson(content)) {
@@ -544,46 +612,69 @@
       }
     }
 
-    function verifyPathParameters(obj) {
-      const json = editor.getValue();
-      try {
-        const parsedJson = JSON.parse(json);
-        let issuesFound = false;
+    function fixPathParameters() {
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    let fixedParamsCount = 0;
 
-        if (!parsedJson.paths) {
-          updateChangeLog('No paths found to verify parameters');
-          return;
-        }
+    if (!parsedJson.paths) {
+      updateChangeLog('No paths found to fix parameters');
+      return;
+    }
 
-        Object.keys(parsedJson.paths).forEach(path => {
-          const pathParams = [...path.matchAll(/{([^}]+)}/g)].map(match => match[1]);
-          const pathItem = parsedJson.paths[path];
+    Object.keys(parsedJson.paths).forEach(path => {
+      const pathParams = [...path.matchAll(/{([^}]+)}/g)].map(match => match[1]);
+      const pathItem = parsedJson.paths[path];
 
-          Object.keys(pathItem).forEach(method => {
-            if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options', 'trace'].includes(method)) {
-              const operation = pathItem[method];
-              const definedParams = (operation.parameters || [])
-                .filter(p => p.in === 'path')
-                .map(p => p.name);
+      Object.keys(pathItem).forEach(method => {
+        if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options', 'trace'].includes(method)) {
+          const operation = pathItem[method];
+          
+          // Initialize parameters array if it doesn't exist
+          if (!operation.parameters) {
+            operation.parameters = [];
+          }
+          
+          // Get existing path parameter names
+          const definedParams = operation.parameters
+            .filter(p => p.in === 'path')
+            .map(p => p.name);
 
-              pathParams.forEach(param => {
-                if (!definedParams.includes(param)) {
-                  issuesFound = true;
-                  updateChangeLog(`Warning: Missing definition for path parameter "${param}" in ${method.toUpperCase()} ${path}`);
-                }
-              });
+          // Add missing path parameters
+          pathParams.forEach(param => {
+            if (!definedParams.includes(param)) {
+              // Create a new parameter definition
+              const newParameter = {
+                name: param,
+                in: 'path',
+                required: true,
+                schema: {
+                  type: 'string'
+                },
+                description: 'Auto-generated path parameter'
+              };
+              
+              // Add the parameter to the operation
+              operation.parameters.push(newParameter);
+              fixedParamsCount++;
+              updateChangeLog(`Fixed: Added missing path parameter "${param}" to ${method.toUpperCase()} ${path}`);
             }
           });
-        });
-
-        if (!issuesFound) {
-          updateChangeLog('All path parameters are properly defined');
         }
-      } catch (error) {
-        console.error('Error verifying path parameters:', error);
-        updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
-      }
+      });
+    });
+
+    if (fixedParamsCount === 0) {
+      updateChangeLog('No missing path parameters found to fix');
+    } else {
+      editor.setValue(JSON.stringify(parsedJson, null, 2));
     }
+  } catch (error) {
+    console.error('Error fixing path parameters:', error);
+    updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+  }
+}
 
     function removeExampleKeys(obj) {
       const json = editor.getValue();
@@ -639,8 +730,11 @@
       if (document.getElementById('fixPaths').checked) fixPathsEndingWithSlash();
       if (document.getElementById('handleCircular').checked) handleCircularReferences();
       if (document.getElementById('removeExamples').checked) removeExampleKeys();
-      if (document.getElementById('verifyParams').checked) verifyPathParameters();
+      if (document.getElementById('fixParams').checked) fixPathParameters();
       if (document.getElementById('handleDuplicates').checked) handleDuplicateParameters();
+      if (document.getElementById('shortenDescriptions').checked) shortenDescriptions();
+      if (document.getElementById('fixMissingRefs').checked) fixMissingReferences();
+      checkInfoTitle();
     }
 
     function updateChangeLog(message) {
@@ -688,6 +782,602 @@
       reader.readAsText(file);
     }
 
+    function shortenDescriptions() {
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    const shortenedPaths = traverseAndShortenDescriptions(parsedJson);
+    const updatedJson = JSON.stringify(parsedJson, null, 2);
+    editor.setValue(updatedJson);
+    if (shortenedPaths.length > 0) {
+      updateChangeLog('Shortened descriptions:\n' + shortenedPaths.join('\n'));
+    } else {
+      updateChangeLog('No descriptions found to shorten');
+    }
+  } catch (error) {
+    console.error('Error shortening descriptions:', error);
+    updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+  }
+}
+
+function traverseAndShortenDescriptions(obj, circularRefs = new Set(), path = '') {
+  if (circularRefs.has(obj)) {
+    return [];
+  }
+  circularRefs.add(obj);
+
+  const shortenedPaths = [];
+  const MAX_LENGTH = 100; // Maximum length for descriptions
+
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const currentPath = path ? `${path}.${key}` : key;
+      
+      if (key === 'description' && typeof obj[key] === 'string' && obj[key].length > MAX_LENGTH) {
+        // Preserve the original description
+        const originalDesc = obj[key];
+        
+        // Get the first sentence or first 100 chars
+        let shortened = '';
+        
+        // Try to get the first sentence
+        const sentenceMatch = originalDesc.match(/^(.*?[.!?])(\s|$)/);
+        if (sentenceMatch && sentenceMatch[1].length <= MAX_LENGTH) {
+          shortened = sentenceMatch[1];
+        } else {
+          // Get first MAX_LENGTH chars, trying to cut at a space
+          const truncated = originalDesc.substring(0, MAX_LENGTH);
+          const lastSpaceIndex = truncated.lastIndexOf(' ');
+          
+          if (lastSpaceIndex > 0.7 * MAX_LENGTH) {
+            shortened = truncated.substring(0, lastSpaceIndex);
+          } else {
+            shortened = truncated;
+          }
+          
+          // Add ellipsis to indicate truncation
+          shortened += '...';
+        }
+        
+        // Preserve markdown headers if present
+        if (originalDesc.startsWith('#')) {
+          const headerMatch = originalDesc.match(/^(#+\s+[^\n]+)(\n|$)/);
+          if (headerMatch) {
+            shortened = headerMatch[1] + '\n' + shortened;
+          }
+        }
+        
+        obj[key] = shortened;
+        shortenedPaths.push(`- Shortened: ${currentPath} (${originalDesc.length} chars → ${shortened.length} chars)`);
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        shortenedPaths.push(...traverseAndShortenDescriptions(obj[key], circularRefs, currentPath));
+      }
+    }
+  }
+
+  circularRefs.delete(obj);
+  return shortenedPaths;
+}
+
+function checkInfoTitle() {
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    
+    // Check if info object exists
+    if (!parsedJson.info) {
+      showInfoTitleModal('missing-info');
+      return;
+    }
+    
+    // Check if info.title exists
+    if (!parsedJson.info.title || parsedJson.info.title.trim() === '') {
+      showInfoTitleModal('missing-title');
+      return;
+    }
+    
+    updateChangeLog('Info title is properly defined: "' + parsedJson.info.title + '"');
+  } catch (error) {
+    console.error('Error checking info title:', error);
+    updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+  }
+}
+
+// Show modal to prompt for info title
+function showInfoTitleModal(type) {
+  const modal = document.getElementById('infoTitleModal');
+  const modalTitle = document.getElementById('info-title-modal-title');
+  const modalDescription = document.getElementById('info-title-modal-description');
+  
+  if (type === 'missing-info') {
+    modalTitle.textContent = 'Missing Info Object';
+    modalDescription.textContent = 'The OpenAPI schema is missing the required "info" object. Please enter a title for your API:';
+  } else {
+    modalTitle.textContent = 'Missing API Title';
+    modalDescription.textContent = 'The OpenAPI schema is missing the required "title" in the info object. Please enter a title for your API:';
+  }
+  
+  modal.classList.add('is-active');
+}
+
+// Save the info title to the schema
+function saveInfoTitle() {
+  const titleInput = document.getElementById('info-title-input');
+  const title = titleInput.value.trim();
+  
+  if (!title) {
+    alert('Please enter a valid title');
+    return;
+  }
+  
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    
+    // Create info object if it doesn't exist
+    if (!parsedJson.info) {
+      parsedJson.info = {};
+    }
+    
+    // Set the title
+    parsedJson.info.title = title;
+    
+    // Update the editor value
+    editor.setValue(JSON.stringify(parsedJson, null, 2));
+    
+    // Close the modal
+    document.getElementById('infoTitleModal').classList.remove('is-active');
+    
+    updateChangeLog(`Added info.title: "${title}"`);
+  } catch (error) {
+    console.error('Error saving info title:', error);
+    updateChangeLog('Error: Failed to update the schema with the new title.');
+  }
+}
+
+// Function to keep half of the paths
+function keepHalfPaths() {
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    
+    if (!parsedJson.paths || Object.keys(parsedJson.paths).length === 0) {
+      updateChangeLog('No paths found to modify');
+      return;
+    }
+    
+    const pathKeys = Object.keys(parsedJson.paths);
+    const totalPaths = pathKeys.length;
+    const halfPaths = Math.ceil(totalPaths / 2);
+    
+    // Keep only the first half of the paths
+    const remainingPaths = {};
+    for (let i = 0; i < halfPaths; i++) {
+      remainingPaths[pathKeys[i]] = parsedJson.paths[pathKeys[i]];
+    }
+    
+    // Update the paths object
+    parsedJson.paths = remainingPaths;
+    
+    editor.setValue(JSON.stringify(parsedJson, null, 2));
+    updateChangeLog(`Kept ${halfPaths} out of ${totalPaths} paths (Removed ${totalPaths - halfPaths} paths)`);
+  } catch (error) {
+    console.error('Error keeping half paths:', error);
+    updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+  }
+}
+
+// Toggle modal for limiting paths
+function togglePathLimitModal() {
+  const modal = document.getElementById('pathLimitModal');
+  modal.classList.toggle('is-active');
+}
+
+// Function to keep a limited number of paths
+function keepLimitedPaths() {
+  const limitInput = document.getElementById('path-limit-input');
+  const limit = parseInt(limitInput.value.trim(), 10);
+  
+  if (isNaN(limit) || limit <= 0) {
+    alert('Please enter a valid positive number');
+    return;
+  }
+  
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    
+    if (!parsedJson.paths || Object.keys(parsedJson.paths).length === 0) {
+      updateChangeLog('No paths found to modify');
+      return;
+    }
+    
+    const pathKeys = Object.keys(parsedJson.paths);
+    const totalPaths = pathKeys.length;
+    const numToKeep = Math.min(limit, totalPaths);
+    
+    // Keep only the specified number of paths
+    const remainingPaths = {};
+    for (let i = 0; i < numToKeep; i++) {
+      remainingPaths[pathKeys[i]] = parsedJson.paths[pathKeys[i]];
+    }
+    
+    // Update the paths object
+    parsedJson.paths = remainingPaths;
+    
+    editor.setValue(JSON.stringify(parsedJson, null, 2));
+    updateChangeLog(`Kept ${numToKeep} out of ${totalPaths} paths (Removed ${totalPaths - numToKeep} paths)`);
+  } catch (error) {
+    console.error('Error keeping limited paths:', error);
+    updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+  }
+  
+  // Close the modal
+  togglePathLimitModal();
+}
+
+// Toggle modal for filtering paths by pattern
+function togglePathPatternModal() {
+  const modal = document.getElementById('pathPatternModal');
+  modal.classList.toggle('is-active');
+}
+
+// Function to keep paths that match a pattern
+function keepPathsByPattern() {
+  const patternInput = document.getElementById('path-pattern-input');
+  const pattern = patternInput.value.trim();
+  
+  if (!pattern) {
+    alert('Please enter a valid pattern');
+    return;
+  }
+  
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    
+    if (!parsedJson.paths || Object.keys(parsedJson.paths).length === 0) {
+      updateChangeLog('No paths found to modify');
+      return;
+    }
+    
+    const pathKeys = Object.keys(parsedJson.paths);
+    const totalPaths = pathKeys.length;
+    
+    // Keep only paths that match the pattern
+    const remainingPaths = {};
+    let keepCount = 0;
+    
+    for (const path of pathKeys) {
+      if (path.includes(pattern)) {
+        remainingPaths[path] = parsedJson.paths[path];
+        keepCount++;
+      }
+    }
+    
+    // Update the paths object
+    parsedJson.paths = remainingPaths;
+    
+    editor.setValue(JSON.stringify(parsedJson, null, 2));
+    updateChangeLog(`Kept ${keepCount} out of ${totalPaths} paths that match pattern "${pattern}" (Removed ${totalPaths - keepCount} paths)`);
+  } catch (error) {
+    console.error('Error keeping paths by pattern:', error);
+    updateChangeLog('Error: Invalid JSON input. Please check the format and try again.');
+  }
+  
+  // Close the modal
+  togglePathPatternModal();
+}
+function fixMissingReferences() {
+  const json = editor.getValue();
+  try {
+    const parsedJson = JSON.parse(json);
+    
+    // First collect all references
+    const references = collectReferences(parsedJson);
+    
+    // Find missing references
+    const missingRefs = findMissingReferences(parsedJson, references);
+    
+    if (missingRefs.length > 0) {
+      // Create stubs for missing references
+      createMissingReferences(parsedJson, missingRefs);
+      
+      // Update editor with fixed content
+      editor.setValue(JSON.stringify(parsedJson, null, 2));
+      
+      // Log changes
+      updateChangeLog('Fixed missing references:\n' + 
+        missingRefs.map(ref => `- Created stub for missing reference: ${ref}`).join('\n'));
+    } else {
+      updateChangeLog('No missing references found');
+    }
+    
+    // Special handling for common OpenAPI schema issues
+    fixOpenAPISpecificIssues(parsedJson);
+    
+    // Final update after all fixes
+    editor.setValue(JSON.stringify(parsedJson, null, 2));
+    
+  } catch (error) {
+    console.error('Error fixing missing references:', error);
+    updateChangeLog('Error: ' + error.message);
+  }
+}
+
+// Collect all $ref values in the schema
+function collectReferences(obj, circularRefs = new Set(), refs = []) {
+  if (!obj || typeof obj !== 'object' || circularRefs.has(obj)) {
+    return refs;
+  }
+  
+  circularRefs.add(obj);
+
+  if (obj.$ref && typeof obj.$ref === 'string') {
+    refs.push(obj.$ref);
+  }
+
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key) && typeof obj[key] === 'object' && obj[key] !== null) {
+      collectReferences(obj[key], circularRefs, refs);
+    }
+  }
+
+  circularRefs.delete(obj);
+  return refs;
+}
+
+// Find references that don't exist in the schema
+function findMissingReferences(schema, references) {
+  const missingRefs = [];
+  
+  for (const ref of references) {
+    // Only process local references (starting with #)
+    if (ref.startsWith('#/')) {
+      const path = ref.substring(2).split('/');
+      let current = schema;
+      let missing = false;
+      
+      for (const segment of path) {
+        if (current[segment] === undefined) {
+          missing = true;
+          missingRefs.push(ref);
+          break;
+        }
+        current = current[segment];
+      }
+    }
+  }
+  
+  return missingRefs;
+}
+
+// Create stub objects for missing references
+function createMissingReferences(schema, missingRefs) {
+  for (const ref of missingRefs) {
+    if (ref.startsWith('#/')) {
+      const path = ref.substring(2).split('/');
+      let current = schema;
+      
+      // Create nested objects as needed
+      for (let i = 0; i < path.length - 1; i++) {
+        const segment = path[i];
+        if (current[segment] === undefined) {
+          current[segment] = {};
+        }
+        current = current[segment];
+      }
+      
+      // Create appropriate stub based on the reference path
+      const lastSegment = path[path.length - 1];
+      if (current[lastSegment] === undefined) {
+        if (path.includes('schemas')) {
+          // If referencing a schema, create a schema stub
+          current[lastSegment] = {
+            type: "object",
+            properties: {},
+            description: "Auto-generated stub for missing schema reference"
+          };
+        } else if (path.includes('responses')) {
+          // If referencing a response, create a response stub
+          current[lastSegment] = {
+            description: "Auto-generated stub for missing response reference",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {}
+                }
+              }
+            }
+          };
+        } else if (path.includes('parameters')) {
+          // If referencing a parameter, create a parameter stub
+          current[lastSegment] = {
+            name: lastSegment,
+            in: "query",
+            schema: {
+              type: "string"
+            },
+            description: "Auto-generated stub for missing parameter reference"
+          };
+        } else if (path.includes('requestBodies')) {
+          // If referencing a request body, create a request body stub
+          current[lastSegment] = {
+            description: "Auto-generated stub for missing requestBody reference",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {}
+                }
+              }
+            }
+          };
+        } else if (path.includes('headers')) {
+          // If referencing a header, create a header stub
+          current[lastSegment] = {
+            description: "Auto-generated stub for missing header reference",
+            schema: {
+              type: "string"
+            }
+          };
+        } else if (path.includes('securitySchemes')) {
+          // If referencing a security scheme, create a security scheme stub
+          current[lastSegment] = {
+            type: "apiKey",
+            name: lastSegment,
+            in: "header",
+            description: "Auto-generated stub for missing security scheme reference"
+          };
+        } else if (path.includes('examples')) {
+          // If referencing an example, create an example stub
+          current[lastSegment] = {
+            summary: "Auto-generated example",
+            value: {}
+          };
+        } else {
+          // Generic stub for any other reference type
+          current[lastSegment] = {
+            description: "Auto-generated stub for missing reference",
+            type: "object",
+            properties: {}
+          };
+        }
+      }
+    }
+  }
+}
+
+// Fix common OpenAPI specific issues
+function fixOpenAPISpecificIssues(schema) {
+  let fixesApplied = false;
+  
+  // Ensure components object exists
+  if (!schema.components) {
+    schema.components = {};
+    updateChangeLog('Created missing components object');
+    fixesApplied = true;
+  }
+  
+  // Ensure common component sections exist
+  const commonSections = [
+    'schemas', 'responses', 'parameters', 'examples', 
+    'requestBodies', 'headers', 'securitySchemes', 'links', 'callbacks'
+  ];
+  
+  commonSections.forEach(section => {
+    if (!schema.components[section]) {
+      schema.components[section] = {};
+      updateChangeLog(`Created missing components.${section} object`);
+      fixesApplied = true;
+    }
+  });
+
+  // Check for incomplete security schemes
+  if (schema.components.securitySchemes) {
+    for (const [key, scheme] of Object.entries(schema.components.securitySchemes)) {
+      if (scheme.type === 'oauth2' && (!scheme.flows || Object.keys(scheme.flows).length === 0)) {
+        scheme.flows = {
+          clientCredentials: {
+            tokenUrl: scheme.tokenUrl || '/oauth/token',
+            scopes: scheme.scopes || { "api": "API access" }
+          }
+        };
+        updateChangeLog(`Fixed incomplete OAuth2 security scheme: ${key}`);
+        fixesApplied = true;
+        
+        // Remove any properties that should be inside the flows object
+        ['tokenUrl', 'authorizationUrl', 'refreshUrl', 'scopes'].forEach(prop => {
+          if (scheme[prop]) {
+            delete scheme[prop];
+          }
+        });
+      }
+    }
+  }
+  
+  // Check for missing response objects in paths
+  if (schema.paths) {
+    for (const [path, pathItem] of Object.entries(schema.paths)) {
+      for (const [method, operation] of Object.entries(pathItem)) {
+        if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options', 'trace'].includes(method)) {
+          if (!operation.responses || Object.keys(operation.responses).length === 0) {
+            operation.responses = {
+              "200": {
+                description: "Successful response",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {}
+                    }
+                  }
+                }
+              }
+            };
+            updateChangeLog(`Added missing responses object to ${method.toUpperCase()} ${path}`);
+            fixesApplied = true;
+          } else {
+            // Check each response for missing content
+            for (const [code, response] of Object.entries(operation.responses)) {
+              if (!response.content && code !== 'default' && !['204', '304'].includes(code)) {
+                response.content = {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {}
+                    }
+                  }
+                };
+                updateChangeLog(`Added missing content to ${code} response in ${method.toUpperCase()} ${path}`);
+                fixesApplied = true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Fix schema objects missing type property
+  function fixSchemaMissingType(obj, path = '') {
+    if (!obj || typeof obj !== 'object') return false;
+    
+    let fixed = false;
+    
+    // If it looks like a schema object but has no type
+    if (obj.properties && typeof obj.properties === 'object' && !obj.type) {
+      obj.type = 'object';
+      updateChangeLog(`Added missing type: "object" to schema at ${path || 'root'}`);
+      fixed = true;
+    }
+    
+    // Recursively check all properties
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key) && typeof obj[key] === 'object' && obj[key] !== null) {
+        const childPath = path ? `${path}.${key}` : key;
+        if (fixSchemaMissingType(obj[key], childPath)) {
+          fixed = true;
+        }
+      }
+    }
+    
+    return fixed;
+  }
+  
+  if (fixSchemaMissingType(schema)) {
+    fixesApplied = true;
+  }
+  
+  // If no fixes were applied, log message
+  if (!fixesApplied) {
+    updateChangeLog('No OpenAPI-specific issues to fix');
+  }
+  
+  return schema;
+}
+
   </script>
   <!-- Modal for URL input -->
   <div class="modal" id="urlModal">
@@ -718,6 +1408,75 @@
     If you have suggestions or improvements, please
     <a href="https://github.com/shiftnerd/openapidoctor">submit a pull request</a>.
   </footer>
+  <div class="modal" id="infoTitleModal">
+    <div class="modal-background" onclick="document.getElementById('infoTitleModal').classList.remove('is-active')"></div>
+    <div class="modal-card" style="background-color: var(--bg-color); color: var(--text-color);">
+      <header class="modal-card-head" style="background-color: var(--bg-color); border-color: var(--text-color);">
+        <p class="modal-card-title" id="info-title-modal-title" style="color: var(--text-color);">Missing API Title</p>
+        <button class="delete" aria-label="close" onclick="document.getElementById('infoTitleModal').classList.remove('is-active')"></button>
+      </header>
+      <section class="modal-card-body" style="background-color: var(--bg-color);">
+        <div class="field">
+          <p id="info-title-modal-description" style="margin-bottom: 1rem;">The OpenAPI schema is missing the required "title" in the info object. Please enter a title for your API:</p>
+          <div class="control">
+            <input class="input" type="text" id="info-title-input" placeholder="Enter API title (e.g. 'My Awesome API')"
+              style="background-color: var(--bg-color); color: var(--text-color); border-color: var(--text-color);">
+          </div>
+        </div>
+      </section>
+      <footer class="modal-card-foot" style="background-color: var(--bg-color); border-color: var(--text-color);">
+        <button class="button is-success" onclick="saveInfoTitle()">Save</button>
+        <button class="button" onclick="document.getElementById('infoTitleModal').classList.remove('is-active')">Cancel</button>
+      </footer>
+    </div>
+  </div>
+  <!-- Modal for limiting paths -->
+<div class="modal" id="pathLimitModal">
+  <div class="modal-background" onclick="togglePathLimitModal()"></div>
+  <div class="modal-card" style="background-color: var(--bg-color); color: var(--text-color);">
+    <header class="modal-card-head" style="background-color: var(--bg-color); border-color: var(--text-color);">
+      <p class="modal-card-title" style="color: var(--text-color);">Keep Limited Paths</p>
+      <button class="delete" aria-label="close" onclick="togglePathLimitModal()"></button>
+    </header>
+    <section class="modal-card-body" style="background-color: var(--bg-color);">
+      <div class="field">
+        <label class="label" style="color: var(--text-color);">Number of Paths to Keep</label>
+        <div class="control">
+          <input class="input" type="number" id="path-limit-input" min="1" placeholder="Enter number of paths to keep"
+            style="background-color: var(--bg-color); color: var(--text-color); border-color: var(--text-color);">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot" style="background-color: var(--bg-color); border-color: var(--text-color);">
+      <button class="button is-success" onclick="keepLimitedPaths()">Apply</button>
+      <button class="button" onclick="togglePathLimitModal()">Cancel</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Modal for filtering paths by pattern -->
+<div class="modal" id="pathPatternModal">
+  <div class="modal-background" onclick="togglePathPatternModal()"></div>
+  <div class="modal-card" style="background-color: var(--bg-color); color: var(--text-color);">
+    <header class="modal-card-head" style="background-color: var(--bg-color); border-color: var(--text-color);">
+      <p class="modal-card-title" style="color: var(--text-color);">Keep Paths by Pattern</p>
+      <button class="delete" aria-label="close" onclick="togglePathPatternModal()"></button>
+    </header>
+    <section class="modal-card-body" style="background-color: var(--bg-color);">
+      <div class="field">
+        <label class="label" style="color: var(--text-color);">Path Pattern</label>
+        <div class="control">
+          <input class="input" type="text" id="path-pattern-input" placeholder="Enter pattern (e.g., /users)"
+            style="background-color: var(--bg-color); color: var(--text-color); border-color: var(--text-color);">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot" style="background-color: var(--bg-color); border-color: var(--text-color);">
+      <button class="button is-success" onclick="keepPathsByPattern()">Apply</button>
+      <button class="button" onclick="togglePathPatternModal()">Cancel</button>
+    </footer>
+  </div>
+</div>
 </body>
 
 </html>
