@@ -1,3 +1,7 @@
+/* Schema Doctor: Reducer Edition — app.js
+ * Static, client-side only. No backend required.
+ */
+
 // Global state
 let originalEditor, reducedEditor, ajvInstance = null;
 const HTTP_METHODS = new Set(['get','post','put','patch','delete','head','options','trace']);
@@ -266,16 +270,28 @@ function countLines(text) {
   }
   
   /** Append line + action counts to the status line */
-  function updateMetricsDisplay(reducedObj) {
-    const origText = originalEditor ? originalEditor.getValue() : '';
-    const redText  = reducedEditor  ? reducedEditor.getValue()  : '';
+  function updateMetricsDisplay(reducedObj, { alsoStatus = true } = {}) {
+      const origText = originalEditor ? originalEditor.getValue() : '';
+      const redText  = reducedEditor  ? reducedEditor.getValue()  : '';
+      const origObj  = parseMaybeYamlOrJson(origText) || {};
   
-    const origObj = parseMaybeYamlOrJson(origText) || {};
-    const linesMsg = `Lines ${countLines(origText)}→${countLines(redText)}`;
-    const actionsMsg = `Actions ${countActionsFromSpec(origObj)}/${countActionsFromSpec(reducedObj)}`;
+      const origLines = countLines(origText);
+      const redLines  = countLines(redText);
+      const origActs  = countActionsFromSpec(origObj);
+      const redActs   = countActionsFromSpec(reducedObj);
   
-    const el = document.getElementById('status');
-    if (el) el.textContent = (el.textContent || '').replace(/\s*$/, '') + ` • ${linesMsg} • ${actionsMsg}`;
+      // Persist in the page
+      renderMetrics({ origLines, reducedLines: redLines, origActions: origActs, reducedActions: redActs });
+  
+      // Optional: also append to the status line
+      if (alsoStatus) {
+        const el = document.getElementById('status');
+        if (el) {
+          const linesMsg   = `Lines ${origLines}→${redLines}`;
+          const actionsMsg = `Actions ${origActs}/${redActs}`;
+          el.textContent = (el.textContent || '').replace(/\s*$/, '') + ` • ${linesMsg} • ${actionsMsg}`;
+        }
+      }
   }
 
 // Utility: detect & parse JSON or YAML
@@ -668,6 +684,20 @@ async function validateWithAjv(oas) {
   }
 }
 
+function renderMetrics({ origLines, reducedLines, origActions, reducedActions }) {
+    const wrap = document.getElementById('metrics');
+    if (!wrap) return;
+    const linesEl = document.getElementById('metric-lines');
+    const actsEl  = document.getElementById('metric-actions');
+  
+    const linesText = `Lines: ${origLines} → ${reducedLines}`;
+    const actsText  = `Actions: ${origActions}/${reducedActions}${origActions === reducedActions ? '' : ' ⚠'}`;
+  
+    if (linesEl)  linesEl.textContent = linesText;
+    if (actsEl)   actsEl.textContent  = actsText;
+    wrap.style.visibility = 'visible';
+  }
+
 // Generate reduced schema from the original editor
 async function generateReduced() {
   setStatus('Reducing…');
@@ -682,6 +712,7 @@ async function generateReduced() {
     const { ok, errors } = await validateWithAjv(reduced);
 
     reducedEditor.setValue(JSON.stringify(reduced, null, 2));
+    updateMetricsDisplay(reduced);
     if (ok) setStatus('Reduced schema ready.');
     else setStatus(`Reduced schema generated with validation notes (${errors.length}).`, 'warn');
   } catch (e) {
