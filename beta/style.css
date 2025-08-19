@@ -1,5 +1,6 @@
 :root {
-    --bg: #0f1216; --panel:#161b22; --text:#e6edf3; --muted:#9ba5b1; --accent:#3b82f6; --ok:#10b981; --warn:#f59e0b; --err:#ef4444;
+    --bg: #0f1216; --panel:#161b22; --text:#e6edf3; --muted:#9ba5b1; --accent:#3b82f6; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --accent-ghost: color-mix(in oklab, var(--accent), transparent 85%);
+    --border: rgba(255,255,255,0.10);
   }
   body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
   body.theme-dark { background:#0b0e13; color:var(--text); }
@@ -89,4 +90,289 @@
   .metric-chip.warn {
     border-color: #d88771;
     background: rgba(216,135,113,0.08);
+  }
+
+  /* Accordion shell */
+.filter-accordion {
+    margin-top: .5rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)) ,
+      var(--panel, #161b22);
+    box-shadow:
+      0 8px 24px rgba(0,0,0,.20),
+      0 1px 0 rgba(255,255,255,.04) inset;
+    overflow: clip;
+    position: relative;
+  }
+  
+  /* Accent bar on the left */
+  .filter-accordion::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--accent), transparent);
+    opacity: .9;
+  }
+  
+  /* Summary row (header) */
+  .filter-summary-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .65rem .9rem;
+    cursor: pointer;
+    background: linear-gradient(180deg, var(--accent-ghost), transparent);
+    user-select: none;
+    font-weight: 600;
+    color: var(--text, #dfe6ee);
+  }
+  
+  /* Chevron indicator */
+  .filter-summary-row .chev {
+    width: .8rem;
+    height: .8rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform .18s ease;
+    opacity: .85;
+  }
+  #filter-panel[open] .filter-summary-row .chev { transform: rotate(45deg); }
+  
+  /* Small pill that shows “on · 3 methods · 12 tags” */
+  .summary-pill {
+    margin-left: auto;
+    font-weight: 500;
+    font-size: .85rem;
+    color: var(--muted, #8aa);
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: .15rem .5rem;
+  }
+  
+  /* Body grid */
+  .filter-grid {
+    display: grid;
+    gap: .75rem;
+    padding: .75rem .9rem 1rem;
+  }
+  
+  /* Toolbar above the tag list */
+  .filter-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .5rem;
+    position: sticky;
+    top: 0;
+    background: color-mix(in oklab, var(--panel, #161b22), transparent 10%);
+    backdrop-filter: blur(6px);
+    padding: .35rem .4rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  
+  /* Tag search input */
+  #filter-tag-search {
+    flex: 1;
+    min-width: 220px;
+    padding: .45rem .6rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text, #dfe6ee);
+  }
+  
+  /* Tag list area */
+  .filter-tags {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* was 160px */
+    gap: .5rem;
+    max-height: 260px;
+    overflow: auto;
+    padding-right: .25rem;
+  }  
+  
+  /* Tag “chips” (labels) */
+  .filter-tags label {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .3rem .55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border, rgba(255,255,255,.10));
+    background: rgba(255,255,255,.03);
+    color: var(--text, #dfe6ee);
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+    font-size: .9rem;
+    min-width: 0;       /* allow inner text to shrink */
+    max-width: 100%;    /* respect grid cell width */
+  }
+  
+  /* Emphasize checked tags */
+  .filter-tags label:has(input[type="checkbox"]:checked) {
+    border-color: color-mix(in oklab, var(--accent), white 20%);
+    background: color-mix(in oklab, var(--accent), transparent 85%);
+    color: color-mix(in oklab, var(--accent), white 15%);
+  }
+  
+  /* Checkbox accent color (modern browsers) */
+  .filter-tags input[type="checkbox"] { accent-color: var(--accent, #6ec1ff); }
+  
+  /* Methods fieldset spacing */
+  fieldset > legend {
+    opacity: .9;
+    font-weight: 600;
+    padding: 0 .25rem;
+  }
+  fieldset label { margin-right: .8rem; }
+  
+  /* Stats row in the footer of the accordion */
+  #filter-stats {
+    opacity: .85;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  
+  /* Smooth open/close */
+  @media (prefers-reduced-motion: no-preference) {
+    #filter-panel[open] .filter-grid {
+      animation: filterFade .18s ease both;
+    }
+    @keyframes filterFade {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  }
+
+  .filter-tags .tag-text {
+    display: inline-block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;        /* single-line with ellipsis */
+    line-height: 1.1;
+  }
+  
+  /* Emphasize checked chips */
+  .filter-tags label:has(input[type="checkbox"]:checked) {
+    border-color: color-mix(in oklab, var(--accent, #6ec1ff), white 20%);
+    background: color-mix(in oklab, var(--accent, #6ec1ff), transparent 85%);
+    color: color-mix(in oklab, var(--accent, #6ec1ff), white 15%);
+  }
+  
+  /* --- Optional: WRAP MODE (two-line clamp) ---
+     Add class 'wrap-tags' to #filter-panel to enable */
+  #filter-panel.wrap-tags .filter-tags .tag-text {
+    white-space: normal;              /* allow wrapping */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;            /* clamp to 2 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;          /* still ellipsis on last line */
+    word-break: break-word;
+  }
+
+  /* Toggle row container */
+.filter-toggle {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .35rem;
+    padding: .35rem .4rem .5rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+  }
+  
+  /* Switch control */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text, #dfe6ee);
+    font-weight: 600;
+  }
+  
+  .switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0; height: 0;
+  }
+  
+  .switch .slider {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid var(--border);
+    transition: background .15s ease, border-color .15s ease;
+  }
+  
+  .switch .slider::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .18s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  
+  /* Checked / focus states */
+  .switch input:checked + .slider {
+    background: color-mix(in oklab, var(--accent), transparent 30%);
+    border-color: color-mix(in oklab, var(--accent), white 20%);
+  }
+  .switch input:checked + .slider::after { transform: translateX(20px); }
+  
+  .switch input:focus-visible + .slider {
+    outline: 2px solid color-mix(in oklab, var(--accent), white 15%);
+    outline-offset: 2px;
+  }
+  
+  .switch .switch-label {
+    font-weight: 700;
+  }
+  
+  /* Hint line under the switch */
+  .toggle-hint {
+    font-size: .9rem;
+    color: var(--muted, #8aa);
+  }
+  
+  /* Make the accordion visibly "ON" when enabled */
+  .filter-accordion.enabled {
+    border-color: color-mix(in oklab, var(--accent), white 18%);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent), white 20%) inset,
+      0 8px 24px rgba(0,0,0,.20);
+  }
+  .filter-accordion.enabled .filter-summary-row {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 85%), transparent);
+  }
+  
+  /* Summary pill shows ON/OFF clearly */
+  .summary-pill {
+    margin-left: auto;
+    font-weight: 700;            /* heavier weight for emphasis */
+    font-size: .85rem;
+    border-radius: 999px;
+    padding: .15rem .6rem;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,.04);
+    color: var(--muted, #8aa);
+  }
+  
+  .filter-accordion.enabled .summary-pill {
+    background: color-mix(in oklab, var(--accent), transparent 85%);
+    color: color-mix(in oklab, var(--accent), white 10%);
+    border-color: color-mix(in oklab, var(--accent), white 20%);
   }
