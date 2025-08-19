@@ -50,7 +50,12 @@
         <button id="reduceBtn" class="btn primary">Generate Reduced Schema</button>
         <span id="status" class="status" aria-live="polite"></span>
       </div>
-
+<!-- Persistent metrics -->
+<div id="metrics" aria-live="polite">
+    <span class="metric-label">Metrics</span>
+    <span id="metric-lines"   class="metric-chip">Lines: —</span>
+    <span id="metric-actions" class="metric-chip">Actions: —</span>
+  </div>
       <details class="hint">
         <summary>Having CORS trouble fetching a URL?</summary>
         Try downloading the schema and using the upload/paste options. Some servers block cross‑origin fetches.
@@ -68,7 +73,7 @@
       </div>
     </section>
   </main>
-
+  
   <footer class="foot">
     <small>Open‑source libs: js‑yaml, Ajv, Monaco, FileSaver</small>
   </footer>
