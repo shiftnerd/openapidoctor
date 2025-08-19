@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Schema Doctor: Reducer Edition</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">🩺 Schema Doctor: <span class="muted">Reducer Edition</span></div>
+    <div class="actions">
+      <button id="themeToggle" class="btn" title="Toggle theme">🌗 Theme</button>
+      <button id="copyBtn" class="btn" title="Copy reduced JSON">📋 Copy</button>
+      <button id="downloadBtn" class="btn primary" title="Download reduced.json">⬇️ Download</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="pane inputs">
+      <h2>Input</h2>
+
+      <div class="input-row">
+        <label for="schemaUrl">Fetch by URL</label>
+        <div class="urlbar">
+          <input id="schemaUrl" type="url" placeholder="https://example.com/openapi.yaml or .json" />
+          <button id="fetchBtn" class="btn">Fetch</button>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <label>Upload file (JSON or YAML)</label>
+        <div id="dropZone" class="dropzone" tabindex="0" aria-label="Drop file here or click to choose">
+          <input id="fileInput" type="file" accept=".json,.yaml,.yml,application/json,text/yaml" hidden />
+          <div class="dz-hint">Drag & drop here or <span class="linkish">browse</span></div>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <label for="pasteArea">Paste JSON/YAML</label>
+        <textarea id="pasteArea" placeholder="Paste your OpenAPI schema here…" rows="6"></textarea>
+        <div class="row-right">
+          <button id="loadPasteBtn" class="btn">Load Paste</button>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <button id="reduceBtn" class="btn primary">Generate Reduced Schema</button>
+        <span id="status" class="status" aria-live="polite"></span>
+      </div>
+
+      <details class="hint">
+        <summary>Having CORS trouble fetching a URL?</summary>
+        Try downloading the schema and using the upload/paste options. Some servers block cross‑origin fetches.
+      </details>
+    </section>
+
+    <section class="pane editors">
+      <div class="editor-group">
+        <h2>Original (read‑only)</h2>
+        <div id="originalEditor" class="editor"></div>
+      </div>
+      <div class="editor-group">
+        <h2>Reduced (JSON)</h2>
+        <div id="reducedEditor" class="editor"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <small>Open‑source libs: js‑yaml, Ajv, Monaco, FileSaver</small>
+  </footer>
+
+  <!-- Libraries (CDNJS, no SRI to avoid mismatches) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ajv/8.17.1/ajv7.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+
+  <!-- Monaco loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/loader.min.js" crossorigin="anonymous"></script>
+
+  <script>
+    // Monaco worker config for CDN usage
+    window.MonacoEnvironment = {
+      getWorkerUrl: function(workerId, label) {
+        const base = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/';
+        const code = `self.MonacoEnvironment={baseUrl:'${base}'};importScripts('${base}vs/base/worker/workerMain.js');`;
+        return URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      }
+    };
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' } });
+  </script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>
