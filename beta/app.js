@@ -103,6 +103,12 @@ function safeKeyFrom(path, method, operationId) {
     }
   }
   
+  function normalizeStatusCode(code) {
+    // Turn "2xx", "4XX", " 3 Xx " into "200", "400", "300"
+    const s = String(code).trim();
+    const m = s.match(/^([1-5])\s*[Xx]{2}$/);
+    return m ? `${m[1]}00` : s;
+  }
   // Keep only JSON content; collect schema refs
   function pickJsonContent(content, neededSchemas) {
     if (!content || typeof content !== 'object') return undefined;
@@ -123,6 +129,99 @@ function safeKeyFrom(path, method, operationId) {
     return out;
   }
   
+  // --- Fix: object has "required" but no "properties" ---
+function ensureRequiredPropsOnObject(schema) {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return;
+  
+    const hasRequired = Array.isArray(schema.required) && schema.required.length > 0;
+    // If "required" exists but type is missing, assume object (that's the only type with "required" for properties)
+    if (hasRequired && !schema.type) schema.type = 'object';
+  
+    if (schema.type === 'object') {
+      const props = (schema.properties && typeof schema.properties === 'object') ? schema.properties : (hasRequired ? (schema.properties = {}) : null);
+      if (props && hasRequired) {
+        for (const name of schema.required) {
+          if (!props[name]) {
+            props[name] = {
+              type: 'string',
+              description: `Auto-generated placeholder for ${name}.`
+            };
+          }
+        }
+      }
+    }
+  }
+  
+  // Generic schema walker (mirrors the keys you already recurse for elsewhere)
+  function walkSchema(schema, seen = new Set()) {
+    if (!schema || typeof schema !== 'object') return;
+    if (seen.has(schema)) return;
+    seen.add(schema);
+  
+    // Apply the fix at this node
+    ensureRequiredPropsOnObject(schema);
+  
+    // Recurse common JSON Schema keywords
+    const keys = [
+      'allOf','oneOf','anyOf','not','if','then','else',
+      'items','additionalItems','contains','propertyNames','dependentSchemas',
+      'unevaluatedProperties','additionalProperties','prefixItems'
+    ];
+    for (const k of keys) {
+      const v = schema[k];
+      if (!v) continue;
+      if (Array.isArray(v)) v.forEach(x => walkSchema(x, seen));
+      else if (typeof v === 'object') walkSchema(v, seen);
+    }
+  
+    // Properties and patternProperties hold nested schemas in their values
+    if (schema.properties && typeof schema.properties === 'object') {
+      for (const sub of Object.values(schema.properties)) walkSchema(sub, seen);
+    }
+    if (schema.patternProperties && typeof schema.patternProperties === 'object') {
+      for (const sub of Object.values(schema.patternProperties)) walkSchema(sub, seen);
+    }
+  }
+  
+  // Run the fix across the whole reduced document
+  function fixRequiredPropsAcrossDoc(out) {
+    // Components.schemas
+    if (out?.components?.schemas && typeof out.components.schemas === 'object') {
+      for (const s of Object.values(out.components.schemas)) walkSchema(s);
+    }
+  
+    // Components.requestBodies -> application/json schema
+    if (out?.components?.requestBodies) {
+      for (const rb of Object.values(out.components.requestBodies)) {
+        const sch = rb?.content?.['application/json']?.schema;
+        if (sch) walkSchema(sch);
+      }
+    }
+  
+    // Components.responses -> application/json schema + header schemas
+    if (out?.components?.responses) {
+      for (const resp of Object.values(out.components.responses)) {
+        const sch = resp?.content?.['application/json']?.schema;
+        if (sch) walkSchema(sch);
+        if (resp?.headers && typeof resp.headers === 'object') {
+          for (const h of Object.values(resp.headers)) {
+            if (h?.schema) walkSchema(h.schema);
+          }
+        }
+      }
+    }
+  
+    // Inline requestBody at operation level (if you keep those)
+    if (out?.paths && typeof out.paths === 'object') {
+      for (const item of Object.values(out.paths)) {
+        for (const op of Object.values(item || {})) {
+          const inl = op?.requestBody?.content?.['application/json']?.schema;
+          if (inl) walkSchema(inl);
+        }
+      }
+    }
+  }
+
   // Merge original op params (path/query/header) + required path stubs
   function mergeParamsWithPathStubs(operation, pathLevelParams, pathKey) {
     const out = [];
@@ -465,7 +564,7 @@ function pickStringTags(arr) {
     return Array.from(new Set(cleaned)); // de-dupe, stable-ish
   }
 
-  function reduceOpenAPI(spec) {
+  function reduceOpenAPI(spec, filter) {
     const ensured = ensureInfoTitleAndDescription(spec?.info?.title, spec?.info?.description);
 
     const out = {
@@ -528,7 +627,7 @@ function pickStringTags(arr) {
           const method = maybeMethod.toLowerCase();
           if (!HTTP_METHODS.has(method)) continue;
           if (!operation || typeof operation !== 'object') continue;
-  
+          if (!opMatchesFilter(pathKey, method, operation, filter)) continue;
           const reducedOp = {};
           if (operation.summary) reducedOp.summary = operation.summary;
           if (operation.description) reducedOp.description = operation.description;
@@ -578,26 +677,34 @@ function pickStringTags(arr) {
             }
           }
   
-          // Responses: $ref to components; carry JSON schema + headers when present
-          const srcResponses = (operation.responses && typeof operation.responses === 'object') ? operation.responses : null;
-          const codes = srcResponses ? Object.keys(srcResponses) : [];
-          const finalCodes = codes.length ? codes : ['200'];
-          reducedOp.responses = {};
-  
-          for (const code of finalCodes) {
-            let src = srcResponses ? srcResponses[code] : null;
-            if (src && src.$ref) {
-              const resolved = resolveComponentRef(spec, src.$ref);
-              if (resolved) src = resolved;
-            }
-            const desc = (src && typeof src.description === 'string' && src.description.trim())
-              ? src.description.trim()
-              : undefined;
-  
-            const opKey = safeKeyFrom(pathKey, method, operation.operationId);
-            const compKey = ensureResponseRef(out, code, desc, src, opKey, neededSchemas);
-            reducedOp.responses[code] = { $ref: `#/components/responses/${compKey}` };
-          }
+// Responses: $ref to components; carry JSON schema + headers when present
+const srcResponses = (operation.responses && typeof operation.responses === 'object') ? operation.responses : null;
+const codes = srcResponses ? Object.keys(srcResponses) : [];
+const finalCodes = codes.length ? codes : ['200'];
+reducedOp.responses = {};
+
+const seenNormalized = new Set();
+for (const rawCode of finalCodes) {
+  const normCode = normalizeStatusCode(rawCode);
+  if (seenNormalized.has(normCode)) continue;  // avoid dupes like 400 + 4xx
+  seenNormalized.add(normCode);
+
+  let src = srcResponses ? srcResponses[rawCode] : null;
+  if (src && src.$ref) {
+    const resolved = resolveComponentRef(spec, src.$ref);
+    if (resolved) src = resolved;
+  }
+
+  const desc = (src && typeof src.description === 'string' && src.description.trim())
+    ? src.description.trim()
+    : undefined;
+
+  const opKey = safeKeyFrom(pathKey, method, operation.operationId);
+  const compKey = ensureResponseRef(out, normCode, desc, src, opKey, neededSchemas);
+
+  // Use the normalized code as the operation key
+  reducedOp.responses[normCode] = { $ref: `#/components/responses/${compKey}` };
+}
   
           reducedPathItem[method] = reducedOp;
         }
@@ -651,7 +758,7 @@ function pickStringTags(arr) {
     }
   
     copyNeededSchemas(spec, out, neededSchemas);
-  
+  fixRequiredPropsAcrossDoc(out);
     return out;
   }
 
@@ -698,28 +805,59 @@ function renderMetrics({ origLines, reducedLines, origActions, reducedActions })
     wrap.style.visibility = 'visible';
   }
 
+  function wireFilterPanel(spec) {
+    const panel = document.getElementById('filter-panel');
+    if (!panel || panel.__wired) return;
+    panel.__wired = true;
+  
+    panel.addEventListener('toggle', () => {
+      if (panel.open && !__filterUIBuilt) {
+        buildTagFilterUI(spec);
+        wireFilterButtons();
+        __filterUIBuilt = true;
+        // After first build, compute an initial stats preview
+        recomputeFilterStatsDebounced(spec);
+      }
+    });
+  
+    // React to any input change to keep stats+summary fresh
+    const onAnyChange = debounce(() => { getFilterFromUI(spec); }, 120);
+    panel.addEventListener('change', onAnyChange);
+    panel.addEventListener('input', onAnyChange);
+  }
+
 // Generate reduced schema from the original editor
 async function generateReduced() {
-  setStatus('Reducing…');
-  try {
-    const text = originalEditor.getValue();
-    const obj = parseMaybeYamlOrJson(text);
-    if (!obj) throw new Error('Original editor content is not valid JSON/YAML.');
-
-    const reduced = reduceOpenAPI(obj);
-
-    // Optional validation
-    const { ok, errors } = await validateWithAjv(reduced);
-
-    reducedEditor.setValue(JSON.stringify(reduced, null, 2));
-    updateMetricsDisplay(reduced);
-    if (ok) setStatus('Reduced schema ready.');
-    else setStatus(`Reduced schema generated with validation notes (${errors.length}).`, 'warn');
-  } catch (e) {
-    console.error(e);
-    setStatus(e.message || 'Reduction failed.', 'error');
+    try {
+      setStatus('Reducing…');
+  
+      const origText = originalEditor.getValue();
+      const spec = parseMaybeYamlOrJson(origText);
+      if (!spec) throw new Error('Unable to parse schema. Is it valid JSON or YAML?');
+  
+      // Lazy-build/wire the accordion (only on first open)
+      wireFilterPanel(spec);
+  
+      // If user already opened it and picked things, read them now
+      const filter = getFilterFromUI(spec);
+  
+      const reduced = reduceOpenAPI(spec, filter);
+      const { ok, errors } = await validateWithAjv(reduced);
+  
+      reducedEditor.setValue(JSON.stringify(reduced, null, 2));
+      updateMetricsDisplay(reduced);
+  
+      setStatus(
+        ok
+          ? `Reduced schema ready${filter?.enabled ? ' (filtered)' : ''}.`
+          : `Reduced schema generated with validation notes (${errors.length})${filter?.enabled ? ' (filtered)' : ''}.`,
+        ok ? 'info' : 'warn'
+      );
+    } catch (e) {
+      console.error(e);
+      setStatus(e.message || 'Failed to reduce schema', 'error');
+    }
   }
-}
 
 // Clipboard copy
 async function copyReduced() {
@@ -731,6 +869,233 @@ async function copyReduced() {
     setStatus('Copy failed (clipboard may require HTTPS).', 'error');
   }
 }
+
+// Keep some state
+let __filterUIBuilt = false;
+let __filterStatsTimer = null;
+
+// Debounce helper
+function debounce(fn, wait = 250) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
+
+// Parse comma/newline path tokens; /regex/ tokens become RegExp, others are substrings
+function parsePathTokens(raw) {
+    if (!raw) return [];
+    const parts = String(raw).split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+    return parts.map(tok => {
+      if (tok.length >= 2 && tok.startsWith('/') && tok.endsWith('/')) {
+        try { return { kind: 'regex', re: new RegExp(tok.slice(1, -1), 'i') }; }
+        catch { return { kind: 'substr', s: tok.toLowerCase() }; }
+      }
+      return { kind: 'substr', s: tok.toLowerCase() };
+    });
+  }
+  
+  // Check if an operation matches method/path/tags constraints
+  function opMatchesFilter(pathKey, method, operation, filter) {
+    if (!filter?.enabled) return true;
+  
+    if (filter.methods?.size && !filter.methods.has(method.toLowerCase())) return false;
+  
+    if (Array.isArray(filter.pathTokens) && filter.pathTokens.length) {
+      const ok = filter.pathTokens.some(t =>
+        t.kind === 'regex' ? t.re.test(pathKey) : pathKey.toLowerCase().includes(t.s)
+      );
+      if (!ok) return false;
+    }
+  
+    if (filter.tags?.size) {
+      const opTags = Array.isArray(operation.tags) ? operation.tags.map(t => String(t).trim()) : [];
+      const ok = opTags.some(t => filter.tags.has(t));
+      if (!ok) return false;
+    }
+  
+    return true;
+  }
+  
+  // Read current UI filter state; optionally trigger stats recompute + summary
+  function getFilterFromUI(spec, updateStats = true) {
+    const enabled = !!document.getElementById('filter-enabled')?.checked;
+  
+    const methodBoxes = Array.from(document.querySelectorAll('.filter-method'));
+    const methods = new Set(methodBoxes.filter(b => b.checked).map(b => b.value.toLowerCase()));
+  
+    const rawPaths = document.getElementById('filter-paths')?.value || '';
+    const pathTokens = parsePathTokens(rawPaths);
+  
+    const tagBoxes = Array.from(document.querySelectorAll('.filter-tag'));
+    const tags = new Set(tagBoxes.filter(b => b.checked).map(b => b.value));
+  
+    const hasAny = methods.size > 0 || pathTokens.length > 0 || tags.size > 0;
+    const filter = { enabled: enabled && hasAny, methods, pathTokens, tags };
+  
+    if (updateStats) recomputeFilterStatsDebounced(spec);
+    updateFilterSummary();
+  
+    return filter;
+  }
+  
+  // Clear button wiring (top-level, not nested)
+  function wireFilterButtons() {
+    const clearBtn = document.getElementById('filter-clear');
+    if (clearBtn && !clearBtn.__wired) {
+      clearBtn.__wired = true;
+      clearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('filter-enabled').checked = false;
+        document.getElementById('filter-paths').value = '';
+        document.querySelectorAll('.filter-method, .filter-tag').forEach(cb => cb.checked = false);
+        const el = document.getElementById('filter-stats'); if (el) el.textContent = '';
+        updateFilterSummary();
+        setStatus('Filter cleared.');
+      });
+    }
+  }
+
+// Builds tag checkboxes from spec.tags and operation tags
+function buildTagFilterUI(spec) {
+  const host = document.getElementById('filter-tags');
+  if (!host) return;
+
+  // Collect tag names
+  const set = new Set();
+  if (Array.isArray(spec?.tags)) {
+    spec.tags.forEach(t => t?.name && set.add(String(t.name)));
+  }
+  if (spec?.paths && typeof spec.paths === 'object') {
+    for (const item of Object.values(spec.paths)) {
+      for (const op of Object.values(item || {})) {
+        if (op && Array.isArray(op.tags)) op.tags.forEach(n => n && set.add(String(n)));
+      }
+    }
+  }
+
+  host.innerHTML = '';
+  if (!set.size) {
+    host.innerHTML = '<em style="opacity:.7;">No tags discovered in this schema.</em>';
+    return;
+  }
+
+  // Render function with search + selection persistence
+  function render(filterText = '') {
+    const prev = new Set(
+      Array.from(document.querySelectorAll('.filter-tag')).filter(cb => cb.checked).map(cb => cb.value)
+    );
+    host.innerHTML = '';
+
+    const q = filterText.trim().toLowerCase();
+    const names = [...set].sort((a,b) => a.localeCompare(b)).filter(n => !q || n.toLowerCase().includes(q));
+
+    const frag = document.createDocumentFragment();
+    for (const name of names) {
+        const id = `tag_${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+      
+        const label = document.createElement('label');
+        label.style.marginRight = '.5rem';
+        label.title = name; // tooltip with the full name
+      
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'filter-tag';
+        cb.value = name;
+        cb.id = id;
+        cb.checked = prev.has(name);
+      
+        const text = document.createElement('span');
+        text.className = 'tag-text';
+        text.textContent = name;
+      
+        label.appendChild(cb);
+        label.appendChild(text);
+        frag.appendChild(label);
+      }
+    host.appendChild(frag);
+  }
+
+  // Initial render
+  render('');
+
+  // Wire search box
+  const search = document.getElementById('filter-tag-search');
+  if (search && !search.__wired) {
+    search.__wired = true;
+    search.addEventListener('input', debounce(() => render(search.value), 150));
+  }
+
+  // Bulk actions
+  const allBtn  = document.getElementById('tag-all');
+  const noneBtn = document.getElementById('tag-none');
+  if (allBtn && !allBtn.__wired) {
+    allBtn.__wired = true;
+    allBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.filter-tag').forEach(cb => cb.checked = true);
+      updateFilterSummary();
+    });
+  }
+  if (noneBtn && !noneBtn.__wired) {
+    noneBtn.__wired = true;
+    noneBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.filter-tag').forEach(cb => cb.checked = false);
+      updateFilterSummary();
+    });
+  }
+}
+
+// Summary line under the accordion title
+function updateFilterSummary() {
+    try {
+      const panel   = document.getElementById('filter-panel');
+      const enabled = !!document.getElementById('filter-enabled')?.checked;
+  
+      const methods = Array.from(document.querySelectorAll('.filter-method:checked')).length;
+      const paths   = (document.getElementById('filter-paths')?.value || '').trim();
+      const tags    = Array.from(document.querySelectorAll('.filter-tag:checked')).length;
+  
+      const parts = [];
+      parts.push(enabled ? 'ON' : 'OFF');
+      if (enabled) {
+        if (methods) parts.push(`${methods} methods`);
+        if (paths)   parts.push('path tokens');
+        if (tags)    parts.push(`${tags} tags`);
+      }
+  
+      // Update header pill
+      const sum = document.getElementById('filter-summary');
+      if (sum) sum.textContent = parts.join(' · ');
+  
+      // Light up the panel when enabled
+      if (panel) panel.classList.toggle('enabled', enabled);
+    } catch { /* ignore */ }
+  }
+
+// Recompute the "Filter matches: X of Y" lazily (1900 ops safe)
+const recomputeFilterStatsDebounced = debounce((spec) => {
+    const filter = getFilterFromUI(spec, /*updateStats*/ false);
+    const el = document.getElementById('filter-stats');
+  
+    if (!(filter?.enabled)) { if (el) el.textContent = ''; return; }
+  
+    const run = () => {
+      let total = 0, match = 0;
+      for (const [p, item] of Object.entries(spec.paths || {})) {
+        for (const [k, op] of Object.entries(item || {})) {
+          if (!HTTP_METHODS.has(k.toLowerCase())) continue;
+          total++;
+          if (opMatchesFilter(p, k, op, filter)) match++;
+        }
+      }
+      if (el) el.textContent = `Filter matches: ${match} of ${total} operations`;
+    };
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 400 });
+    else setTimeout(run, 0);
+  }, 200);
 
 // Download reduced.json
 function downloadReduced() {
