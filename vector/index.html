@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vector Doctor — Image → SVG (client-side)</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Optional font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <!-- ImageTracer.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">🩺</div>
+      <h1>Vector Doctor</h1>
+    </div>
+    <nav class="top-actions">
+      <button id="resetBtn" class="btn ghost" title="Clear the current session and start over">Reset</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="panel controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">Controls</h2>
+
+      <div class="group">
+        <label for="fileInput" class="label">Select Image</label>
+        <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.webp" />
+        <div id="dropZone" class="dropzone" tabindex="0" aria-label="Drag and drop image here">
+          <p>Drag & drop PNG/JPG/WebP here, or click to choose.</p>
+        </div>
+        <div id="fileMeta" class="meta small muted" aria-live="polite"></div>
+      </div>
+
+      <div class="group">
+        <h3>Resize (optional)</h3>
+        <div class="grid two">
+          <div>
+            <label for="widthInput" class="label">Width (px)</label>
+            <input id="widthInput" type="number" min="1" step="1" placeholder="auto" />
+          </div>
+          <div>
+            <label for="heightInput" class="label">Height (px)</label>
+            <input id="heightInput" type="number" min="1" step="1" placeholder="auto" />
+          </div>
+        </div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="lockAspect" type="checkbox" checked />
+            <span>Lock aspect ratio</span>
+          </label>
+        </div>
+        <div class="grid two">
+          <div>
+            <label for="maxWidthInput" class="label">Fit to max width</label>
+            <input id="maxWidthInput" type="number" min="1" step="1" placeholder="e.g. 1024" />
+          </div>
+          <div class="fit-actions">
+            <button id="fitBtn" class="btn" title="Resize to fit within the max width">Fit</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Vectorize options</h3>
+        <div class="grid two">
+          <div>
+            <label for="colorsInput" class="label" title="Palette size used during color quantization">Colors</label>
+            <input id="colorsInput" type="number" min="2" max="64" step="1" value="8" />
+          </div>
+          <div>
+            <label for="pathomitInput" class="label" title="Ignore paths shorter than this length">Path omit</label>
+            <input id="pathomitInput" type="number" min="0" step="1" value="8" />
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <label for="blurInput" class="label" title="Pre-blur radius before tracing">Blur radius</label>
+            <input id="blurInput" type="number" min="0" step="1" value="0" />
+          </div>
+          <div>
+            <label class="checkbox" title="Filter out noisy thin lines">
+              <input id="linefilterInput" type="checkbox" checked />
+              <span>Line filter</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <label for="minareaInput" class="label" title="Minimum area for a path to be kept">Min area</label>
+            <input id="minareaInput" type="number" min="0" step="1" value="10" />
+          </div>
+          <div>
+            <label for="roundcoordsInput" class="label" title="Round SVG coordinate decimals">Round coords</label>
+            <input id="roundcoordsInput" type="number" min="0" max="4" step="1" value="1" />
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Background (for raster fallback)</h3>
+        <div class="row">
+          <label class="checkbox">
+            <input id="transparentBg" type="checkbox" checked />
+            <span>Transparent background</span>
+          </label>
+        </div>
+        <div class="row">
+          <label for="bgColorInput" class="label">Background color</label>
+          <input id="bgColorInput" type="color" value="#000000" disabled />
+        </div>
+      </div>
+
+      <div class="group actions">
+        <label class="checkbox">
+          <input id="fallbackEmbed" type="checkbox" />
+          <span>Fallback: embed raster in SVG instead of vectorizing</span>
+        </label>
+        <div class="row wrap gap">
+          <button id="vectorizeBtn" class="btn primary">Vectorize</button>
+          <button id="downloadBtn" class="btn" disabled>Download SVG</button>
+          <button id="copyBtn" class="btn ghost" disabled>Copy SVG</button>
+        </div>
+        <div id="status" class="status small muted" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel preview" aria-labelledby="preview-title">
+      <div class="preview-header">
+        <h2 id="preview-title">Preview</h2>
+        <div class="meta small">
+          <span id="rasterInfo">No image loaded</span>
+          <span class="sep">•</span>
+          <span id="svgInfo">SVG: —</span>
+        </div>
+        <div id="spinner" class="spinner hidden" role="status" aria-label="Working"></div>
+      </div>
+
+      <div class="tabs">
+        <button id="tabInput" class="tab active">Input</button>
+        <button id="tabSVG" class="tab">SVG</button>
+      </div>
+
+      <div class="tabpanes">
+        <div id="paneInput" class="tabpane active">
+          <canvas id="inputCanvas" class="canvas" aria-label="Input raster preview"></canvas>
+          <img id="inputImg" alt="" hidden />
+        </div>
+        <div id="paneSVG" class="tabpane">
+          <div id="svgPreview" class="svgbox"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer small muted">
+    <p>All processing is client-side. Images never leave your browser.</p>
+    <p class="tiny">Powered by <a href="https://github.com/jankovicsandras/imagetracerjs" target="_blank" rel="noopener">ImageTracer.js</a>.</p>
+  </footer>
+
+  <script defer src="app.js"></script>
+</body>
+</html>
