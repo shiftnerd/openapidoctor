@@ -1,6 +1,4 @@
-/* Schema Doctor: Reducer Edition — app.js
- * Static, client-side only. No backend required.
- */
+/* Schema Doctor: Reducer Edition — app.js */
 
 // Global state
 let originalEditor, reducedEditor, ajvInstance = null;
@@ -526,6 +524,10 @@ function loadFromPaste() {
 function initDropZone() {
   const dz = document.getElementById('dropZone');
   const fileInput = document.getElementById('fileInput');
+  if (!dz || !fileInput) {
+    console.warn('Dropzone elements missing (skipping DnD wiring)');
+    return;
+  }
 
   const openPicker = () => fileInput.click();
 
@@ -1218,21 +1220,38 @@ function downloadReduced() {
 
 // Wire up UI
 function initUI() {
-  document.getElementById('fetchBtn').addEventListener('click', fetchSchemaFromUrl);
-  document.getElementById('loadPasteBtn').addEventListener('click', loadFromPaste);
-  document.getElementById('reduceBtn').addEventListener('click', generateReduced);
-  document.getElementById('copyBtn').addEventListener('click', copyReduced);
-  document.getElementById('downloadBtn').addEventListener('click', downloadReduced);
+  const on = (id, evt, handler) => {
+    const el = document.getElementById(id);
+    if (!el) { console.warn(`Missing #${id} in DOM (skipping listener)`); return; }
+    el.addEventListener(evt, handler);
+  };
+
+  on('fetchBtn',     'click', fetchSchemaFromUrl);
+  on('loadPasteBtn', 'click', loadFromPaste);
+  on('reduceBtn',    'click', generateReduced);
+  on('copyBtn',      'click', copyReduced);
+  on('downloadBtn',  'click', downloadReduced);
 
   const themeBtn = document.getElementById('themeToggle');
-  themeBtn.addEventListener('click', () => setTheme(!document.body.classList.contains('theme-dark')));
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () =>
+      setTheme(!document.body.classList.contains('theme-dark')));
+  } else {
+    console.warn('Missing #themeToggle in DOM');
+  }
 
   initDropZone();
 }
 
 // Bootstrap
-window.addEventListener('DOMContentLoaded', () => {
+function boot() {
   initEditors();
   initUI();
   setStatus('Ready. Load a schema to begin.');
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', boot, { once: true });
+} else {
+  boot();
+}
