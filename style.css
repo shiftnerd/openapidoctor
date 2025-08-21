@@ -1,0 +1,555 @@
+:root {
+    --bg: #0f1216; --panel:#161b22; --text:#e6edf3; --muted:#9ba5b1; --accent:#3b82f6; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --accent-ghost: color-mix(in oklab, var(--accent), transparent 85%);
+    --border: rgba(255,255,255,0.10); --sidebar-w: clamp(340px, 38vw, 720px); --splitter-w: 6px;
+  }
+  body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+  body.theme-dark { background:#0b0e13; color:var(--text); }
+  body:not(.theme-dark) { background:#f6f8fa; color:#0b1220; }
+  
+  .topbar { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:0.75rem 1rem; position:sticky; top:0; backdrop-filter:saturate(1.2) blur(6px); background:rgba(20,24,31,0.75); color:var(--text); border-bottom:1px solid rgba(255,255,255,0.06); }
+  body:not(.theme-dark) .topbar { background:rgba(255,255,255,0.85); color:#0b1220; border-bottom:1px solid rgba(0,0,0,0.05); }
+  .brand { font-weight:700; }
+  .muted { opacity:0.7; }
+  .actions { display:flex; gap:0.5rem; }
+  .btn { padding:0.5rem 0.75rem; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:inherit; cursor:pointer; }
+  .btn.primary { background:var(--accent); color:white; border-color:transparent; }
+  .btn:hover { filter:brightness(1.1); }
+  
+  .inputs .input-row { margin-bottom:1rem; display:flex; flex-direction:column; gap:0.5rem; }
+  label { font-size:0.9rem; opacity:0.9; }
+  .urlbar { display:flex; gap:0.5rem; }
+  .urlbar input { flex:1; padding:0.5rem; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:transparent; color:inherit; }
+  body:not(.theme-dark) .urlbar input { border-color: rgba(0,0,0,0.12); }
+  
+  .dropzone { display:flex; align-items:center; justify-content:center; min-height:86px; border:1.5px dashed rgba(255,255,255,0.18); border-radius:12px; cursor:pointer; }
+  body:not(.theme-dark) .dropzone { border-color: rgba(0,0,0,0.18); }
+  .dropzone.dragging { outline: 2px solid var(--accent); }
+  .dz-hint { opacity:0.8; }
+  .linkish { color:var(--accent); text-decoration:underline; }
+  
+  #pasteArea { width:100%; padding:0.5rem; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:transparent; color:inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  body:not(.theme-dark) #pasteArea { border-color: rgba(0,0,0,0.12); }
+  
+  .row-right { display:flex; justify-content:flex-end; }
+  .status { margin-left:0.75rem; font-size:0.9rem; opacity:0.9; }
+  .status.warn { color: var(--warn); }
+  .status.error { color: var(--err); }
+  
+  .editors { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+  .editor-group h2 { margin:0 0 0.5rem 0; font-size:1rem; opacity:0.9; }
+  .editor { height: 60vh; border:1px solid rgba(255,255,255,0.08); border-radius:12px; overflow:hidden; }
+  body:not(.theme-dark) .editor { border-color: rgba(0,0,0,0.08); }
+  
+  .hint { margin-top:0.5rem; }
+  .foot { padding:0.75rem 1rem; opacity:0.7; }
+  
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 1fr; }
+    .editors { grid-template-columns: 1fr; }
+    .editor { height: 50vh; }
+  }
+
+  /* Metrics container */
+#metrics {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
+    background: var(--panel, rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--muted, #8aa);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  
+  /* Small “Metrics” label */
+  #metrics .metric-label {
+    font-size: 0.9rem;
+    opacity: 0.85;
+    margin-right: 0.25rem;
+    font-family: inherit;
+  }
+  
+  /* Chips for the two numbers */
+  .metric-chip {
+    padding: 0.25rem 0.5rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.02);
+    color: var(--text, #dfe6ee);
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Optional: warn when actions differ (we add “⚠” via JS already) */
+  .metric-chip.warn {
+    border-color: #d88771;
+    background: rgba(216,135,113,0.08);
+  }
+
+  /* Accordion shell */
+.filter-accordion {
+    margin-top: .5rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)) ,
+      var(--panel, #161b22);
+    box-shadow:
+      0 8px 24px rgba(0,0,0,.20),
+      0 1px 0 rgba(255,255,255,.04) inset;
+    overflow: clip;
+    position: relative;
+  }
+  
+  /* Accent bar on the left */
+  .filter-accordion::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--accent), transparent);
+    opacity: .9;
+  }
+  
+  /* Summary row (header) */
+  .filter-summary-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .65rem .9rem;
+    cursor: pointer;
+    background: linear-gradient(180deg, var(--accent-ghost), transparent);
+    user-select: none;
+    font-weight: 600;
+    color: var(--text, #dfe6ee);
+  }
+  
+  /* Chevron indicator */
+  .filter-summary-row .chev {
+    width: .8rem;
+    height: .8rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform .18s ease;
+    opacity: .85;
+  }
+  #filter-panel[open] .filter-summary-row .chev { transform: rotate(45deg); }
+  
+  /* Small pill that shows “on · 3 methods · 12 tags” */
+  .summary-pill {
+    margin-left: auto;
+    font-weight: 500;
+    font-size: .85rem;
+    color: var(--muted, #8aa);
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: .15rem .5rem;
+  }
+  
+  /* Body grid */
+  .filter-grid {
+    display: grid;
+    gap: .75rem;
+    padding: .75rem .9rem 1rem;
+  }
+  
+  /* Toolbar above the tag list */
+  .filter-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .5rem;
+    position: sticky;
+    top: 0;
+    background: color-mix(in oklab, var(--panel, #161b22), transparent 10%);
+    backdrop-filter: blur(6px);
+    padding: .35rem .4rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  
+  /* Tag search input */
+  #filter-tag-search {
+    flex: 1;
+    min-width: 220px;
+    padding: .45rem .6rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text, #dfe6ee);
+  }
+  
+  /* Tag list area */
+  .filter-tags {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* was 160px */
+    gap: .5rem;
+    max-height: 260px;
+    overflow: auto;
+    padding-right: .25rem;
+  }  
+  
+  /* Tag “chips” (labels) */
+  .filter-tags label {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .3rem .55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border, rgba(255,255,255,.10));
+    background: rgba(255,255,255,.03);
+    color: var(--text, #dfe6ee);
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+    font-size: .9rem;
+    min-width: 0;       /* allow inner text to shrink */
+    max-width: 100%;    /* respect grid cell width */
+  }
+  
+  /* Emphasize checked tags */
+  .filter-tags label:has(input[type="checkbox"]:checked) {
+    border-color: color-mix(in oklab, var(--accent), white 20%);
+    background: color-mix(in oklab, var(--accent), transparent 85%);
+    color: color-mix(in oklab, var(--accent), white 15%);
+  }
+  
+  /* Checkbox accent color (modern browsers) */
+  .filter-tags input[type="checkbox"] { accent-color: var(--accent, #6ec1ff); }
+  
+  /* Methods fieldset spacing */
+  fieldset > legend {
+    opacity: .9;
+    font-weight: 600;
+    padding: 0 .25rem;
+  }
+  fieldset label { margin-right: .8rem; }
+  
+  /* Stats row in the footer of the accordion */
+  #filter-stats {
+    opacity: .85;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  
+  /* Smooth open/close */
+  @media (prefers-reduced-motion: no-preference) {
+    #filter-panel[open] .filter-grid {
+      animation: filterFade .18s ease both;
+    }
+    @keyframes filterFade {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  }
+
+  .filter-tags .tag-text {
+    display: inline-block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;        /* single-line with ellipsis */
+    line-height: 1.1;
+  }
+  
+  /* Emphasize checked chips */
+  .filter-tags label:has(input[type="checkbox"]:checked) {
+    border-color: color-mix(in oklab, var(--accent, #6ec1ff), white 20%);
+    background: color-mix(in oklab, var(--accent, #6ec1ff), transparent 85%);
+    color: color-mix(in oklab, var(--accent, #6ec1ff), white 15%);
+  }
+  
+  /* --- Optional: WRAP MODE (two-line clamp) ---
+     Add class 'wrap-tags' to #filter-panel to enable */
+  #filter-panel.wrap-tags .filter-tags .tag-text {
+    white-space: normal;              /* allow wrapping */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;            /* clamp to 2 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;          /* still ellipsis on last line */
+    word-break: break-word;
+  }
+
+  /* Toggle row container */
+.filter-toggle {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .35rem;
+    padding: .35rem .4rem .5rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+  }
+  
+  /* Switch control */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text, #dfe6ee);
+    font-weight: 600;
+  }
+  
+  .switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0; height: 0;
+  }
+  
+  .switch .slider {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid var(--border);
+    transition: background .15s ease, border-color .15s ease;
+  }
+  
+  .switch .slider::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .18s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  
+  /* Checked / focus states */
+  .switch input:checked + .slider {
+    background: color-mix(in oklab, var(--accent), transparent 30%);
+    border-color: color-mix(in oklab, var(--accent), white 20%);
+  }
+  .switch input:checked + .slider::after { transform: translateX(20px); }
+  
+  .switch input:focus-visible + .slider {
+    outline: 2px solid color-mix(in oklab, var(--accent), white 15%);
+    outline-offset: 2px;
+  }
+  
+  .switch .switch-label {
+    font-weight: 700;
+  }
+  
+  /* Hint line under the switch */
+  .toggle-hint {
+    font-size: .9rem;
+    color: var(--muted, #8aa);
+  }
+  
+  /* Make the accordion visibly "ON" when enabled */
+  .filter-accordion.enabled {
+    border-color: color-mix(in oklab, var(--accent), white 18%);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent), white 20%) inset,
+      0 8px 24px rgba(0,0,0,.20);
+  }
+  .filter-accordion.enabled .filter-summary-row {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 85%), transparent);
+  }
+  
+  /* Summary pill shows ON/OFF clearly */
+  .summary-pill {
+    margin-left: auto;
+    font-weight: 700;            /* heavier weight for emphasis */
+    font-size: .85rem;
+    border-radius: 999px;
+    padding: .15rem .6rem;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,.04);
+    color: var(--muted, #8aa);
+  }
+  
+  .filter-accordion.enabled .summary-pill {
+    background: color-mix(in oklab, var(--accent), transparent 85%);
+    color: color-mix(in oklab, var(--accent), white 10%);
+    border-color: color-mix(in oklab, var(--accent), white 20%);
+  }
+
+  /* Locked state: visually disabled and non-interactive */
+.filter-accordion.locked {
+    opacity: .7;
+    filter: grayscale(.1);
+  }
+  
+  .filter-accordion.locked .filter-summary-row {
+    cursor: not-allowed;
+  }
+  
+  /* Block mouse/touch opening (JS will also enforce) */
+  .filter-accordion.locked summary {
+    pointer-events: none;
+  }
+  
+  /* Add a subtle "Locked" pill on the right of the header when locked */
+  .filter-accordion.locked .filter-summary-row::after {
+    content: "Locked — generate first";
+    margin-left: auto;
+    font-weight: 700;
+    font-size: .85rem;
+    padding: .15rem .6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border, rgba(255,255,255,.10));
+    background: rgba(255,255,255,.04);
+    color: var(--muted, #8aa);
+  }
+
+  /* Small utility */
+.hidden { display: none !important; }
+
+/* Inline callouts */
+.callout {
+  padding: .6rem .8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: var(--text, #dfe6ee);
+}
+.callout.info {
+  border-color: color-mix(in oklab, var(--accent, #6ec1ff), white 15%);
+  background: color-mix(in oklab, var(--accent, #6ec1ff), transparent 88%);
+}
+
+/* Small button variant (optional) */
+.btn.small {
+  font-size: .85rem;
+  padding: .25rem .55rem;
+  border-radius: 8px;
+}
+
+/* Footer */
+.app-footer {
+  margin-top: 1rem;
+  padding: .9rem 1rem;
+  font-size: .9rem;
+  color: var(--muted, #8aa);
+  border-top: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.03), transparent);
+
+  .layout {
+    display: grid;
+    grid-template-columns:
+      minmax(260px, var(--sidebar-w))
+      var(--splitter-w)
+      minmax(320px, 1fr);
+    grid-template-areas: "left split right";
+    gap: 0;
+  }
+  
+  /* Map elements to areas */
+  #left-pane  { grid-area: left;  min-width: 0; }
+  #splitter   { grid-area: split; }
+  #right-pane { grid-area: right; min-width: 0; }
+  
+  /* Splitter styling (keep) */
+  .splitter {
+    cursor: col-resize;
+    background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+    border-left: 1px solid rgba(255,255,255,.08);
+    border-right: 1px solid rgba(0,0,0,.25);
+  }
+  .splitter:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--accent, #6ec1ff), white 15%);
+    outline-offset: -2px;
+  }
+  
+  /* Stack on small screens */
+  @media (max-width: 1000px) {
+    .layout {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "left"
+        "right";
+    }
+    .splitter { display: none; }
+    #left-pane, #right-pane { grid-column: 1 !important; }
+  }
+
+/* Helpful wraps so text doesn’t clip */
+.pane, .pane * { min-width: 0; }
+.toggle-hint, #metrics, #status,
+#filter-tag-search, #filter-tags label { white-space: normal; overflow-wrap: anywhere; }
+
+/* Methods list wraps nicely (add this class to the methods fieldset if possible) */
+fieldset.methods-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem 1rem;
+}
+
+/* Ensure hint text can wrap */
+.toggle-hint,
+#filter-tag-search,
+#filter-tags label,
+#metrics,
+#status {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}}
+
+:root {
+  --sidebar-w: clamp(320px, 36vw, 640px);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, var(--sidebar-w)) 1fr; /* left | right */
+  grid-template-areas: "inputs editors";
+  gap: 12px;
+  align-items: start;
+}
+
+.pane.inputs  { grid-area: inputs;  min-width: 0; }
+.pane.editors { grid-area: editors; min-width: 0; }
+
+/* Keep text from forcing columns to overflow */
+.pane, .pane * { min-width: 0; }
+
+/* Add breathing room to pane contents */
+.pane {
+  padding: 1rem;                  /* space inside panes */
+  border-radius: 12px;            /* matches editor rounding */
+  background: var(--panel);       /* subtle background */
+  box-sizing: border-box;
+}
+
+/* Headings spacing */
+.pane h2 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  padding-left: 0.25rem;          /* subtle left inset */
+}
+
+/* Space around each input group */
+.inputs .input-row {
+  margin-bottom: 1.25rem;
+  padding: 0.5rem 0.25rem;
+}
+
+/* Editor groups spacing */
+.editor-group {
+  padding: 0.75rem;
+  background: var(--panel);
+  border-radius: 12px;
+}
+.editor-group h2 {
+  margin-bottom: 0.5rem;
+  padding-left: 0.25rem;
+}
+
+/* Stack only on smaller screens */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "inputs"
+      "editors";
+  }
+}
