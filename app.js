@@ -1,4 +1,6 @@
-/* Schema Doctor: Reducer Edition — app.js */
+/* Schema Doctor: Reducer Edition — app.js
+ * Static, client-side only. No backend required.
+ */
 
 // Global state
 let originalEditor, reducedEditor, ajvInstance = null;
@@ -19,6 +21,42 @@ const GENERIC_RESPONSES = {
     "503": "Service Unavailable"
   };
   
+// ---- operationId helpers ----
+function camelize(parts) {
+  const safe = parts
+    .filter(Boolean)
+    .map(s => s.replace(/[{}]/g, ''))                 // drop {param} braces
+    .map(s => s.replace(/[^0-9A-Za-z]+/g, ' '))       // non-alnum -> space
+    .flatMap(s => s.trim().split(/\s+/));
+  if (!safe.length) return 'op';
+  const head = safe[0].toLowerCase();
+  const tail = safe.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return head + tail.join('');
+}
+
+function makeOpId(pathKey, method) {
+  // e.g. /v1/users/{userId}/roles -> usersUserIdRoles
+  const tokens = String(pathKey).split('/').filter(Boolean);
+  const base = camelize(tokens);
+  // Prefix method for disambiguation (common pattern)
+  const m = method.toLowerCase();
+  const verb = ({get:'get', post:'create', put:'update', patch:'patch', delete:'delete'})[m] || m;
+  return verb + base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+function ensureUniqueId(candidate, used) {
+  let id = candidate && candidate.trim() ? candidate.trim() : 'op';
+  // Avoid starting with a digit (some tools are picky)
+  if (/^\d/.test(id)) id = 'op_' + id;
+  // Collapse weird characters
+  id = id.replace(/[^A-Za-z0-9_.-]/g, '_');
+  if (!used.has(id)) { used.add(id); return id; }
+  let n = 2;
+  while (used.has(`${id}_${n}`)) n++;
+  const unique = `${id}_${n}`;
+  used.add(unique);
+  return unique;
+}
   (function initSplitter() {
     const root = document.documentElement;
     const layout = document.getElementById('app-layout');
@@ -668,7 +706,7 @@ function pickStringTags(arr) {
       }
     }
     const usedTagNames = new Set();
-  
+    const usedOperationIds = new Set();
     // ---- Track components we must carry over ----
     const neededSchemas = new Set();
     const neededParameters = new Set();
@@ -689,7 +727,12 @@ function pickStringTags(arr) {
           const reducedOp = {};
           if (operation.summary) reducedOp.summary = operation.summary;
           if (operation.description) reducedOp.description = operation.description;
-          if (operation.operationId) reducedOp.operationId = operation.operationId;
+          
+          // ---- operationId: copy or synthesize, then ensure global uniqueness ----
+          const rawOpId = operation.operationId || makeOpId(pathKey, method);
+          const opId = ensureUniqueId(rawOpId, usedOperationIds);
+          reducedOp.operationId = opId;
+ //         if (operation.operationId) reducedOp.operationId = operation.operationId;
   
           // tags
           const opTags = pickStringTags(operation.tags);
@@ -757,7 +800,7 @@ for (const rawCode of finalCodes) {
     ? src.description.trim()
     : undefined;
 
-  const opKey = safeKeyFrom(pathKey, method, operation.operationId);
+  const opKey = safeKeyFrom(pathKey, method, opId);
   const compKey = ensureResponseRef(out, normCode, desc, src, opKey, neededSchemas);
 
   // Use the normalized code as the operation key
