@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Schema Doctor v1</title>
+  <title>Schema Doctor: Reducer Edition</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 </head>
 <body class="theme-dark">
   <header class="topbar">
-    <div class="brand">🩺 Schema Doctor v1</div>
+    <div class="brand">🩺 Schema Doctor: <span class="muted">Reducer Edition</span></div>
     <div class="actions">
-      <!-- <button id="themeToggle" class="btn" title="Toggle theme">🌗 Theme</button> -->
+      <button id="themeToggle" class="btn" title="Toggle theme">🌗 Theme</button>
       <button id="copyBtn" class="btn" title="Copy reduced JSON">📋 Copy</button>
       <button id="downloadBtn" class="btn primary" title="Download reduced.json">⬇️ Download</button>
     </div>
@@ -141,14 +141,14 @@
   </main>
   
   <footer id="app-footer" class="app-footer">
-    <div class="footer-content"> Other tools: <a href="https://schemadoctor.com/vector">Convert an image to vector(SVG)</a></div>
+    <div class="footer-content"> Other tools: <a href="https://schemadoctor.com/vector" target="_blank">Convert an image to vector(SVG)</a> | <a href="https://schemadoctor.com/postman" target="_blank">Convert a Postman collection to OpenAPI</a></div>
     <br>
     Disclaimer: This app is a community-driven project built by Ben Climer and is not officially supported or endorsed by Rewst.
     If you have suggestions or improvements, please submit a pull request.
   </footer>
 
   <!-- Libraries (CDNJS, no SRI to avoid mismatches) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ajv/8.17.1/ajv7.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
 
