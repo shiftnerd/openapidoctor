@@ -1,1 +1,6 @@
+# robots.txt for SchemaDoctor.com
+User-agent: *
+Allow: /
+
+# Sitemap location
 Sitemap: https://schemadoctor.com/sitemap.xml
