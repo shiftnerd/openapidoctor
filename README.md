@@ -60,12 +60,14 @@ It provides a user-friendly interface for editing and transforming schemas — m
 
 ---
 
-## 📚 Dependencies
+## 📦 Dependencies
+
 The OpenAPI Schema Editor relies on the following libraries:
+
 - [Monaco Editor](https://microsoft.github.io/monaco-editor/) — code editor for JSON and YAML  
-- [Bulma](https://bulma.io/) — CSS framework for styling  
 - [js-yaml](https://github.com/nodeca/js-yaml) — YAML parser and dumper  
-- [Lodash](https://lodash.com/) — JavaScript utility library  
+- [Ajv](https://ajv.js.org/) — JSON Schema validator (used for OpenAPI 3.0/3.1 validation)  
+- [FileSaver.js](https://github.com/eligrey/FileSaver.js/) — client-side file saving utility  
 
 ---
 
