@@ -1,18 +1,111 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <!-- Basic -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FAQ | Schema Doctor</title>
+  <title>Schema Doctor FAQ | OpenAPI Schema Fixer</title>
+  <meta name="description" content="Answers to common questions about Schema Doctor: what it does, formats supported, privacy, and how to contribute." />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://schemadoctor.com/faq.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Schema Doctor FAQ | OpenAPI Schema Fixer" />
+  <meta property="og:description" content="Answers to common questions about Schema Doctor for validating and cleaning OpenAPI schemas." />
+  <meta property="og:url" content="https://schemadoctor.com/faq.html" />
+  <meta property="og:image" content="https://schemadoctor.com/assets/schema-doctor-preview.png" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Schema Doctor FAQ | OpenAPI Schema Fixer" />
+  <meta name="twitter:description" content="Answers to common questions about Schema Doctor for validating and cleaning OpenAPI schemas." />
+  <meta name="twitter:image" content="https://schemadoctor.com/assets/schema-doctor-preview.png" />
+
+  <!-- Structured data: FAQPage -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Schema Doctor?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Schema Doctor is a free, open-source tool that validates and fixes OpenAPI schemas (JSON/YAML) to make them easier to use in automation workflows."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How is it different from other OpenAPI editors?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Schema Doctor focuses on repair and cleanup—fixing common problems like missing operationIds, invalid regex, and circular references—rather than designing APIs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need to install anything?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Schema Doctor runs entirely in your browser. Paste a schema or load it from a URL."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I use it with private APIs?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. You can paste JSON or YAML directly for internal/private APIs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What formats are supported?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "YAML (auto-converted to JSON) and JSON (direct editing)."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Will Schema Doctor change my API’s behavior?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. It only modifies the schema definition; your API endpoints and behavior remain unchanged."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is Schema Doctor free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. It is open-source under the MIT license."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How can I contribute?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Open issues or pull requests on GitHub, join discussions, and star the repository to support development."
+        }
+      }
+    ]
+  }
+  </script>
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="theme-dark">
   <header class="topbar">
     <div class="brand">🩺 Schema Doctor</div>
     <div class="actions">
-      <a href="index.html" class="btn">🏠 Home</a>
-      <a href="about.html" class="btn">ℹ️ About</a>
-      <button id="themeToggle" class="btn">🌗 Theme</button>
+      <a href="index.html" class="btn" title="Home">🏠 Home</a>
+      <a href="about.html" class="btn" title="About">ℹ️ About</a>
+      <button id="themeToggle" class="btn" title="Toggle theme">🌗 Theme</button>
     </div>
   </header>
 
@@ -23,13 +116,13 @@
     <p>A free, open-source tool that validates and fixes OpenAPI schemas (JSON/YAML) to make them easier to use in automation workflows.</p>
 
     <h2>How is it different from other OpenAPI editors?</h2>
-    <p>Schema Doctor focuses on <em>repair and cleanup</em> — fixing common problems like missing IDs, invalid regex, and circular references — instead of designing APIs from scratch.</p>
+    <p>Schema Doctor focuses on <em>repair and cleanup</em>—fixing common problems like missing IDs, invalid regex, and circular references—rather than designing APIs from scratch.</p>
 
     <h2>Do I need to install anything?</h2>
-    <p>No, Schema Doctor runs entirely in your browser. Just paste a schema or load it from a URL.</p>
+    <p>No. Schema Doctor runs entirely in your browser. Just paste a schema or load it from a URL.</p>
 
     <h2>Can I use it with private APIs?</h2>
-    <p>Yes. You can paste JSON or YAML directly for internal APIs.</p>
+    <p>Yes. You can paste JSON or YAML directly for internal/private APIs.</p>
 
     <h2>What formats are supported?</h2>
     <ul>
@@ -41,19 +134,22 @@
     <p>No. It only modifies the schema, not the actual endpoints.</p>
 
     <h2>Is Schema Doctor free?</h2>
-    <p>Yes, it’s MIT licensed and open-source.</p>
+    <p>Yes—MIT licensed and open-source.</p>
 
     <h2>How can I contribute?</h2>
-    <p>Submit issues or PRs on <a href="https://github.com/shiftnerd/schemadoctor" target="_blank">GitHub</a>, or star ⭐ the repo to show support.</p>
+    <p>Submit issues or PRs on <a href="https://github.com/shiftnerd/schemadoctor" target="_blank" rel="noopener">GitHub</a>, or star ⭐ the repo to show support.</p>
   </main>
 
   <footer class="app-footer">
-    <div class="footer-content">Other tools: 
-      <a href="https://schemadoctor.com/vector" target="_blank">Image → SVG</a> | 
-      <a href="https://schemadoctor.com/postman" target="_blank">Postman → OpenAPI</a>
+    <div class="footer-content">
+      <a href="about.html">About</a> · <a href="faq.html">FAQ</a> ·
+      Other tools:
+      <a href="https://schemadoctor.com/vector" target="_blank" rel="noopener">Image → SVG</a> |
+      <a href="https://schemadoctor.com/postman" target="_blank" rel="noopener">Postman → OpenAPI</a>
     </div>
   </footer>
 
+  <!-- Reuse your existing JS (theme toggle, etc.) -->
   <script src="app.js" defer></script>
 </body>
 </html>
