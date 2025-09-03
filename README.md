@@ -30,21 +30,33 @@ It provides a user-friendly interface for editing and transforming schemas — m
 ---
 
 ## 📖 Usage
-1. Open the OpenAPI Schema Editor in a web browser.  
-2. Enter a URL ending in `.json` or `.yaml` in the provided input field.  
-3. Click **Load** to load the schema from the specified URL.  
-   - If the URL is cross-domain and fails due to same-origin restrictions, you will be prompted to use a proxy server.  
-4. Once loaded, use the available options to manipulate and transform the schema:  
-   - **Convert YAML to JSON** → Converts YAML schema to JSON format  
-   - **Validate JSON** → Validates the loaded JSON schema  
-   - **Beautify JSON** → Formats the JSON schema for readability  
-   - **Set Default Descriptions** → Fills in missing descriptions  
-   - **Add Missing OperationIds** → Ensures API operations have IDs  
-   - **Fix Paths Ending with Slash** → Removes trailing slashes  
-   - **Handle Circular References** → Identifies and logs circular references  
-   - **Run All Options** → Executes all available options in sequence  
-5. The **change log section** displays a record of modifications.  
-6. Switch between dark and light themes using the theme selector.  
+1. **Open the app**  
+   Clone the repository and open `index.html` in your browser. No server or backend is required — everything runs client-side.
+
+2. **Load a schema**  
+   Choose one of the following methods:
+   - **Fetch by URL**: Enter a link ending in `.json` or `.yaml` and click **Fetch**.  
+   - **Upload file**: Drag & drop an OpenAPI file into the drop zone or browse to select one.  
+   - **Paste**: Copy JSON or YAML into the text area and press **Load Paste**.
+
+3. **Generate a reduced schema**  
+   Click **Generate Reduced Schema**.  
+   - The left editor shows the original schema (read-only).  
+   - The right editor shows the reduced output in JSON format, ready for use.
+
+4. **Optional filtering**  
+   Expand the **Endpoint Filter** panel to include/exclude endpoints:
+   - Filter by HTTP methods, path patterns (including regex), or tags.  
+   - Pending changes are applied when you re-generate the reduced schema.  
+   - Metrics below the filter show how many lines and actions were reduced.
+
+5. **Copy or download results**  
+   - Use **📋 Copy** to copy the reduced JSON to your clipboard.  
+   - Use **⬇️ Download** to save it as `reduced.json` locally.
+
+6. **Adjust the view**  
+   - Drag or keyboard-resize the vertical splitter to change the editor layout.  
+   - Toggle between dark and light themes with the 🌗 **Theme** button.
 
 ---
 
