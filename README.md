@@ -1,8 +1,8 @@
 # 🩺 Schema Doctor
 
 [![Website](https://img.shields.io/badge/Website-SchemaDoctor-blue?style=flat-square&logo=google-chrome)](https://schemadoctor.com)
-[![License](https://img.shields.io/github/license/youruser/schema-doctor?style=flat-square)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/youruser/schema-doctor?style=flat-square&logo=github)](https://github.com/shiftnerd/openapidoctor)
+[![License](https://img.shields.io/github/license/shiftnerd/openapidoctor?style=flat-square)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/shiftnerd/openapidoctor?style=flat-square&logo=github)](https://github.com/shiftnerd/openapidoctor)
 
 **Schema Doctor** is a web-based tool to **validate, clean, and manipulate OpenAPI schemas** in JSON or YAML format.  
 It provides a user-friendly interface for editing and transforming schemas — making them automation-ready for platforms like Rewst, n8n, and others.  
